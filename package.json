@@ -1,0 +1,19 @@
+{
+  "name": "tormenta20ficha",
+  "version": "1.0.0",
+  "description": "Proxy Gemini → Firecast",
+  "bin": "gemini-proxy.js",
+  "main": "gemini-proxy.js",
+  "type": "commonjs",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.1.0",
+    "node-fetch": "^2.7.0"
+  },
+  "pkg": {
+    "targets": [
+      "node18-win-x64"
+    ],
+    "outputPath": "output"
+  }
+}

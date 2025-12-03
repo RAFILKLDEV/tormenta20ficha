@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<form name="frmItemHabilidade" width="600" height="60" theme="dark" >
+
+    <layout align="top" height="25">
+        <label text="Nome:" autoSize="true"/>
+        <edit field="nome" align="client"/>
+    </layout>
+
+    <textEditor field="descricao" align="client"/>
+</form>

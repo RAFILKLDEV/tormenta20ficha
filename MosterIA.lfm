@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<form formType="sheetTemplate"
+    dataType="MosterIa"
+    name="frmMonstros"
+    title="Tormenta 20 - MonsterIA"
+    theme="dark"
+    width="1080"
+    height="600"
+    padding="{left=4, top=4, right=4, bottom=4}">
+
+    <script><![CDATA[
+        local ndb = require("ndb")
+
+        -- Mostrar Mana apenas se o node tiver esse campo
+        function atualizarMana(self)
+            local sheet = self.sheet
+            if sheet == nil then return end
+
+            if sheet.mana == nil or sheet.mana == "" then
+                self.edtMana.visible = false
+            else
+                self.edtMana.visible = true
+            end
+        end
+
+        function copilarFicha(form)
+            local node = form.box.node
+            rebuildDynamicButtons(self.frmMonstros, node, sheet.dataIA)
+        end
+
+        -- Eventos de atualização
+        function onNodeReady(self)
+            atualizarMana(self)
+
+            if self.sheet ~= nil then
+                self.sheet:addEventListener("onChanged",
+                    function(_, field)
+                        if field == "mana" then
+                            atualizarMana(self)
+                        end
+                    end)
+            end
+        end
+    ]]></script>
+
+    <!-- BOTÃO NOVO MONSTRO -->
+    <layout align="top" height="30" margins="{bottom=4}">
+        <button text="Novo Monstro" width="120" align="left">
+            <event name="onClick">
+                self.rclMonstros:append();
+            </event>
+        </button>
+        <button text="TESTE" width="120" align="left">
+            <event name="onClick">
+                local rectangle = GUI.newRectangle()
+                rectangle.align = "top"
+                rectangle.height = 30
+                rectangle.name = "rectTeste"
+                rectangle.padding = { left = 10, right = 10, top = 5, bottom = 5 }
+                rectangle.margins = { top = 5 }
+                rectangle.parent = self.flwDin
+
+                local label = GUI.newLabel()
+                label.text = acoes[i].nome
+                label.align = "left"
+                label.width = 220
+                label.parent = rectangle
+            </event>
+        </button>
+    </layout>
+
+    <!-- LISTA DE MONSTROS -->
+    <recordList name="rclMonstros"
+        field="lista"
+        templateForm="frmMonstroItem"
+        selectable="true"
+        layout="horizontal"
+        align="top"
+        height="60">
+
+        <event name="onSelect">
+            local node = self.rclMonstros.selectedNode
+            self.box.node = node
+            self.box.visible = (node ~= nil)
+        </event>
+    </recordList>
+
+    <!-- PAINEL -->
+    <dataScopeBox name="box"
+        visible="false"
+        align="client"
+        margins="{top=4}">
+
+        <scrollBox align="client">
+            <rectangle align="client" color="#202020"
+                padding="{left=4, top=4, right=4, bottom=4}">
+
+                <scrollBox align="client">
+
+                    <!-- TEXTO PARA IA -->
+                    <layout align="top" height="20">
+                        <label text="Texto para IA:" align="left" width="200" />
+                    </layout>
+
+                    <layout align="top" height="120">
+                        <textEditor name="edtTextoIA" field="textoBrutoIA" align="left" width="900" />
+                    </layout>
+
+                    <!-- IA -->
+                    <layout align="top" height="30" margins="{bottom=4}">
+                        <button text="Gerar com IA"
+                            align="left" width="180"
+                            fontColor="#00FFAA">
+                            <event name="onClick">
+                                askAndCallIA(self, self.box.node)
+                            </event>
+                        </button>
+                    </layout>
+
+                    <layout align="top" height="50">
+                        <button text="Copilar Ficha" align="left" width="120"
+                            onClick="copilarFicha(self)" />
+                    </layout>
+
+                    <!-- BASICOS -->
+                    <layout align="top" height="30" margins="{top=4}">
+                        <label align="left" width="50" text="Nome:" />
+                        <edit align="left" width="300" field="nome" />
+                    </layout>
+
+                    <layout align="top" height="30">
+                        <label align="left" width="50" text="ND:" />
+                        <edit align="left" width="50" field="nd" margins="{left=4}" />
+
+                        <label align="left" width="50" text="Tipo:" margins="{left=10}" />
+                        <edit align="left" width="120" field="tipo" />
+
+                        <label align="left" width="100" text="Tamanho:" margins="{left=10}" />
+                        <edit align="left" width="120" field="tamanho" />
+                    </layout>
+
+                    <layout align="top" height="30" margins="{top=4}">
+                        <label align="left" width="50" text="PV:" />
+                        <edit align="left" width="60" field="pv" margins="{left=4}" />
+
+                        <label text="Mana:" align="left" width="60" />
+                        <edit name="edtMana"
+                            align="left"
+                            width="80"
+                            field="mana"
+                            visible="true" />
+
+                        <label align="left" width="50" text="CA:" margins="{left=10}" />
+                        <edit align="left" width="60" field="ca" />
+
+                        <label align="left" width="110" text="Deslocamento:" margins="{left=10}" />
+                        <edit align="left" width="120" field="deslocamento" />
+                    </layout>
+
+                    <!-- ATRIBUTOS -->
+                    <layout align="top" height="20" margins="{top=6}">
+                        <label text="Atributos:" align="left" width="200" />
+                    </layout>
+
+                    <layout align="top" height="30">
+                        <label text="FOR" align="left" width="30" />
+                        <edit field="att_for" align="left" width="40" margins="{left=2, right=8}" />
+
+                        <label text="DES" align="left" width="30" />
+                        <edit field="att_des" align="left" width="40" margins="{left=2, right=8}" />
+
+                        <label text="CON" align="left" width="30" />
+                        <edit field="att_con" align="left" width="40" margins="{left=2, right=8}" />
+
+                        <label text="INT" align="left" width="30" />
+                        <edit field="att_int" align="left" width="40" margins="{left=2, right=8}" />
+
+                        <label text="SAB" align="left" width="30" />
+                        <edit field="att_sab" align="left" width="40" margins="{left=2, right=8}" />
+
+                        <label text="CAR" align="left" width="30" />
+                        <edit field="att_car" align="left" width="40" margins="{left=2}" />
+                    </layout>
+
+                    <!-- RESISTENCIAS -->
+                    <layout align="top" height="20" margins="{top=8}">
+                        <label text="Resistências:" align="left" width="200" />
+                    </layout>
+
+                    <layout align="top" height="30">
+                        <label text="Fort:" align="left" width="40" />
+                        <edit field="res_fort" align="left" width="50" margins="{left=2, right=15}" />
+
+                        <label text="Ref:" align="left" width="40" />
+                        <edit field="res_ref" align="left" width="50" margins="{left=2, right=15}" />
+
+                        <label text="Von:" align="left" width="40" />
+                        <edit field="res_von" align="left" width="50" margins="{left=2}" />
+                    </layout>
+
+                    <!-- AÇÕES -->
+                    <layout align="top" height="20" margins="{top=8}">
+                        <label text="Ações / Rolagens:" align="left" width="200" />
+                    </layout>
+
+                    <layout align="top" height="200" margins="{bottom=8}">
+                        <flowLayout name="flwDin"
+                            align="left"
+                            width="900"
+                            maxControlsPerLine="3"
+                            minWidth="150" />
+                    </layout>
+
+                    <!-- EQUIPAMENTOS -->
+                    <layout align="top" height="20" margins="{top=8}">
+                        <label text="Equipamentos:" align="left" width="200" />
+                    </layout>
+
+                    <layout align="top" height="90">
+                        <textEditor name="edtEquip"
+                            field="equipamentos"
+                            align="left"
+                            width="900"
+                            height="80" />
+                    </layout>
+
+                    <!-- EXCLUIR -->
+                    <layout align="top" height="30" margins="{top=6}">
+                        <button text="Excluir"
+                            align="left" width="120"
+                            fontColor="#FF4444">
+                            <event name="onClick">
+                                if self.box.node then
+                                    local apagar = self.box.node
+                                    self.box.node = nil
+                                    self.box.visible = false
+                                    ndb.deleteNode(apagar)
+                                end
+                            </event>
+                        </button>
+                    </layout>
+
+                </scrollBox>
+            </rectangle>
+        </scrollBox>
+    </dataScopeBox>
+
+</form>

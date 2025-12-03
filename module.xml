@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module sdkVersion="3.7b">
+    <id>Tormenta20MonsterIA</id>
+    <version>2.0</version>
+    <info lang="pt-BR">
+        <name>Tormenta 20 - MonsterIA</name>
+        <description>Plugin para Mesa do Rafilkl =)</description>
+        <author>RAFILKL</author>
+        <contact>https://github.com/RAFILKLDEV</contact>
+        <site>http://www.seu.site.com.br</site>
+    </info>
+    <script>scripts/json.lua</script>
+    <script>scripts/MonsterIA.lua</script>
+    <form>monsterItem.lfm</form>
+    <form>MosterIA.lfm</form>
+    <form>TormentaMonsterIA.lfm</form>
+</module>
