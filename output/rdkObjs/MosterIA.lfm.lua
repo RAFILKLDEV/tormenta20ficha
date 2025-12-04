@@ -36,37 +36,54 @@ local function constructNew_frmMonstros()
     obj:setPadding({left=4, top=4, right=4, bottom=4});
 
 
-        local ndb = require("ndb")
+        local ndb      = require("ndb")
+        local Firecast = require("firecast")
 
-        -- Mostrar Mana apenas se o node tiver esse campo
+        ----------------------------------------------------------------
+        -- Mostra/esconde mana (se quiser customizar depois)
+        ----------------------------------------------------------------
         function atualizarMana(self)
-            local sheet = self.sheet
-            if sheet == nil then return end
+            local node = (self.box and self.box.node) or self.sheet
+            if node == nil then return end
 
-            if sheet.mana == nil or sheet.mana == "" then
-                self.edtMana.visible = false
-            else
+            if self.edtMana ~= nil then
                 self.edtMana.visible = true
             end
         end
 
-        function copilarFicha(form)
-            local node = form.box.node
-            rebuildDynamicButtons(self.frmMonstros, node, sheet.dataIA)
+        ----------------------------------------------------------------
+        -- Recompila os botões dinâmicos a partir do node atual
+        ----------------------------------------------------------------
+        function copilarFicha(self)
+            local node = self.box and self.box.node
+            rebuildButtonsFromNode(self, node)
         end
 
-        -- Eventos de atualização
+        ----------------------------------------------------------------
+        -- Rolagem simples 1d20 + campo (usa SEMPRE o monstro selecionado)
+        ----------------------------------------------------------------
+        function rolarSimples(self, campo, rotulo)
+            local node = (self.box and self.box.node) or self.sheet
+            if node == nil then return end
+
+            local mesa = Firecast.getMesaDe(self)
+            if not mesa or not mesa.activeChat then
+                showMessage("Chat não encontrado.")
+                return
+            end
+
+            local chat = mesa.activeChat
+            local mod  = tonumber(node[campo]) or 0
+            local nome = node.nome or "Criatura"
+
+            chat:rolarDados("1d20+" .. mod, rotulo .. " (" .. nome .. ")")
+        end
+
+        ----------------------------------------------------------------
+        -- Chamado quando a ficha é carregada
+        ----------------------------------------------------------------
         function onNodeReady(self)
             atualizarMana(self)
-
-            if self.sheet ~= nil then
-                self.sheet:addEventListener("onChanged",
-                    function(_, field)
-                        if field == "mana" then
-                            atualizarMana(self)
-                        end
-                    end)
-            end
         end
     
 
@@ -339,12 +356,12 @@ local function constructNew_frmMonstros()
     obj.layout10:setHeight(30);
     obj.layout10:setName("layout10");
 
-    obj.label11 = GUI.fromHandle(_obj_newObject("label"));
-    obj.label11:setParent(obj.layout10);
-    obj.label11:setText("FOR");
-    obj.label11:setAlign("left");
-    obj.label11:setWidth(30);
-    obj.label11:setName("label11");
+    obj.button5 = GUI.fromHandle(_obj_newObject("button"));
+    obj.button5:setParent(obj.layout10);
+    obj.button5:setText("FOR");
+    obj.button5:setAlign("left");
+    obj.button5:setWidth(30);
+    obj.button5:setName("button5");
 
     obj.edit8 = GUI.fromHandle(_obj_newObject("edit"));
     obj.edit8:setParent(obj.layout10);
@@ -354,12 +371,12 @@ local function constructNew_frmMonstros()
     obj.edit8:setMargins({left=2, right=8});
     obj.edit8:setName("edit8");
 
-    obj.label12 = GUI.fromHandle(_obj_newObject("label"));
-    obj.label12:setParent(obj.layout10);
-    obj.label12:setText("DES");
-    obj.label12:setAlign("left");
-    obj.label12:setWidth(30);
-    obj.label12:setName("label12");
+    obj.button6 = GUI.fromHandle(_obj_newObject("button"));
+    obj.button6:setParent(obj.layout10);
+    obj.button6:setText("DES");
+    obj.button6:setAlign("left");
+    obj.button6:setWidth(30);
+    obj.button6:setName("button6");
 
     obj.edit9 = GUI.fromHandle(_obj_newObject("edit"));
     obj.edit9:setParent(obj.layout10);
@@ -369,12 +386,12 @@ local function constructNew_frmMonstros()
     obj.edit9:setMargins({left=2, right=8});
     obj.edit9:setName("edit9");
 
-    obj.label13 = GUI.fromHandle(_obj_newObject("label"));
-    obj.label13:setParent(obj.layout10);
-    obj.label13:setText("CON");
-    obj.label13:setAlign("left");
-    obj.label13:setWidth(30);
-    obj.label13:setName("label13");
+    obj.button7 = GUI.fromHandle(_obj_newObject("button"));
+    obj.button7:setParent(obj.layout10);
+    obj.button7:setText("CON");
+    obj.button7:setAlign("left");
+    obj.button7:setWidth(30);
+    obj.button7:setName("button7");
 
     obj.edit10 = GUI.fromHandle(_obj_newObject("edit"));
     obj.edit10:setParent(obj.layout10);
@@ -384,12 +401,12 @@ local function constructNew_frmMonstros()
     obj.edit10:setMargins({left=2, right=8});
     obj.edit10:setName("edit10");
 
-    obj.label14 = GUI.fromHandle(_obj_newObject("label"));
-    obj.label14:setParent(obj.layout10);
-    obj.label14:setText("INT");
-    obj.label14:setAlign("left");
-    obj.label14:setWidth(30);
-    obj.label14:setName("label14");
+    obj.button8 = GUI.fromHandle(_obj_newObject("button"));
+    obj.button8:setParent(obj.layout10);
+    obj.button8:setText("INT");
+    obj.button8:setAlign("left");
+    obj.button8:setWidth(30);
+    obj.button8:setName("button8");
 
     obj.edit11 = GUI.fromHandle(_obj_newObject("edit"));
     obj.edit11:setParent(obj.layout10);
@@ -399,12 +416,12 @@ local function constructNew_frmMonstros()
     obj.edit11:setMargins({left=2, right=8});
     obj.edit11:setName("edit11");
 
-    obj.label15 = GUI.fromHandle(_obj_newObject("label"));
-    obj.label15:setParent(obj.layout10);
-    obj.label15:setText("SAB");
-    obj.label15:setAlign("left");
-    obj.label15:setWidth(30);
-    obj.label15:setName("label15");
+    obj.button9 = GUI.fromHandle(_obj_newObject("button"));
+    obj.button9:setParent(obj.layout10);
+    obj.button9:setText("SAB");
+    obj.button9:setAlign("left");
+    obj.button9:setWidth(30);
+    obj.button9:setName("button9");
 
     obj.edit12 = GUI.fromHandle(_obj_newObject("edit"));
     obj.edit12:setParent(obj.layout10);
@@ -414,12 +431,12 @@ local function constructNew_frmMonstros()
     obj.edit12:setMargins({left=2, right=8});
     obj.edit12:setName("edit12");
 
-    obj.label16 = GUI.fromHandle(_obj_newObject("label"));
-    obj.label16:setParent(obj.layout10);
-    obj.label16:setText("CAR");
-    obj.label16:setAlign("left");
-    obj.label16:setWidth(30);
-    obj.label16:setName("label16");
+    obj.button10 = GUI.fromHandle(_obj_newObject("button"));
+    obj.button10:setParent(obj.layout10);
+    obj.button10:setText("CAR");
+    obj.button10:setAlign("left");
+    obj.button10:setWidth(30);
+    obj.button10:setName("button10");
 
     obj.edit13 = GUI.fromHandle(_obj_newObject("edit"));
     obj.edit13:setParent(obj.layout10);
@@ -436,12 +453,12 @@ local function constructNew_frmMonstros()
     obj.layout11:setMargins({top=8});
     obj.layout11:setName("layout11");
 
-    obj.label17 = GUI.fromHandle(_obj_newObject("label"));
-    obj.label17:setParent(obj.layout11);
-    obj.label17:setText("Resistências:");
-    obj.label17:setAlign("left");
-    obj.label17:setWidth(200);
-    obj.label17:setName("label17");
+    obj.label11 = GUI.fromHandle(_obj_newObject("label"));
+    obj.label11:setParent(obj.layout11);
+    obj.label11:setText("Resistências:");
+    obj.label11:setAlign("left");
+    obj.label11:setWidth(200);
+    obj.label11:setName("label11");
 
     obj.layout12 = GUI.fromHandle(_obj_newObject("layout"));
     obj.layout12:setParent(obj.scrollBox2);
@@ -449,12 +466,12 @@ local function constructNew_frmMonstros()
     obj.layout12:setHeight(30);
     obj.layout12:setName("layout12");
 
-    obj.label18 = GUI.fromHandle(_obj_newObject("label"));
-    obj.label18:setParent(obj.layout12);
-    obj.label18:setText("Fort:");
-    obj.label18:setAlign("left");
-    obj.label18:setWidth(40);
-    obj.label18:setName("label18");
+    obj.button11 = GUI.fromHandle(_obj_newObject("button"));
+    obj.button11:setParent(obj.layout12);
+    obj.button11:setText("Fort");
+    obj.button11:setAlign("left");
+    obj.button11:setWidth(40);
+    obj.button11:setName("button11");
 
     obj.edit14 = GUI.fromHandle(_obj_newObject("edit"));
     obj.edit14:setParent(obj.layout12);
@@ -464,12 +481,12 @@ local function constructNew_frmMonstros()
     obj.edit14:setMargins({left=2, right=15});
     obj.edit14:setName("edit14");
 
-    obj.label19 = GUI.fromHandle(_obj_newObject("label"));
-    obj.label19:setParent(obj.layout12);
-    obj.label19:setText("Ref:");
-    obj.label19:setAlign("left");
-    obj.label19:setWidth(40);
-    obj.label19:setName("label19");
+    obj.button12 = GUI.fromHandle(_obj_newObject("button"));
+    obj.button12:setParent(obj.layout12);
+    obj.button12:setText("Ref");
+    obj.button12:setAlign("left");
+    obj.button12:setWidth(40);
+    obj.button12:setName("button12");
 
     obj.edit15 = GUI.fromHandle(_obj_newObject("edit"));
     obj.edit15:setParent(obj.layout12);
@@ -479,12 +496,12 @@ local function constructNew_frmMonstros()
     obj.edit15:setMargins({left=2, right=15});
     obj.edit15:setName("edit15");
 
-    obj.label20 = GUI.fromHandle(_obj_newObject("label"));
-    obj.label20:setParent(obj.layout12);
-    obj.label20:setText("Von:");
-    obj.label20:setAlign("left");
-    obj.label20:setWidth(40);
-    obj.label20:setName("label20");
+    obj.button13 = GUI.fromHandle(_obj_newObject("button"));
+    obj.button13:setParent(obj.layout12);
+    obj.button13:setText("Von");
+    obj.button13:setAlign("left");
+    obj.button13:setWidth(40);
+    obj.button13:setName("button13");
 
     obj.edit16 = GUI.fromHandle(_obj_newObject("edit"));
     obj.edit16:setParent(obj.layout12);
@@ -501,12 +518,12 @@ local function constructNew_frmMonstros()
     obj.layout13:setMargins({top=8});
     obj.layout13:setName("layout13");
 
-    obj.label21 = GUI.fromHandle(_obj_newObject("label"));
-    obj.label21:setParent(obj.layout13);
-    obj.label21:setText("Ações / Rolagens:");
-    obj.label21:setAlign("left");
-    obj.label21:setWidth(200);
-    obj.label21:setName("label21");
+    obj.label12 = GUI.fromHandle(_obj_newObject("label"));
+    obj.label12:setParent(obj.layout13);
+    obj.label12:setText("Ações / Rolagens:");
+    obj.label12:setAlign("left");
+    obj.label12:setWidth(200);
+    obj.label12:setName("label12");
 
     obj.layout14 = GUI.fromHandle(_obj_newObject("layout"));
     obj.layout14:setParent(obj.scrollBox2);
@@ -530,12 +547,12 @@ local function constructNew_frmMonstros()
     obj.layout15:setMargins({top=8});
     obj.layout15:setName("layout15");
 
-    obj.label22 = GUI.fromHandle(_obj_newObject("label"));
-    obj.label22:setParent(obj.layout15);
-    obj.label22:setText("Equipamentos:");
-    obj.label22:setAlign("left");
-    obj.label22:setWidth(200);
-    obj.label22:setName("label22");
+    obj.label13 = GUI.fromHandle(_obj_newObject("label"));
+    obj.label13:setParent(obj.layout15);
+    obj.label13:setText("Equipamentos:");
+    obj.label13:setAlign("left");
+    obj.label13:setWidth(200);
+    obj.label13:setName("label13");
 
     obj.layout16 = GUI.fromHandle(_obj_newObject("layout"));
     obj.layout16:setParent(obj.scrollBox2);
@@ -558,13 +575,13 @@ local function constructNew_frmMonstros()
     obj.layout17:setMargins({top=6});
     obj.layout17:setName("layout17");
 
-    obj.button5 = GUI.fromHandle(_obj_newObject("button"));
-    obj.button5:setParent(obj.layout17);
-    obj.button5:setText("Excluir");
-    obj.button5:setAlign("left");
-    obj.button5:setWidth(120);
-    obj.button5:setFontColor("#FF4444");
-    obj.button5:setName("button5");
+    obj.button14 = GUI.fromHandle(_obj_newObject("button"));
+    obj.button14:setParent(obj.layout17);
+    obj.button14:setText("Excluir");
+    obj.button14:setAlign("left");
+    obj.button14:setWidth(120);
+    obj.button14:setFontColor("#FF4444");
+    obj.button14:setName("button14");
 
     obj._e_event0 = obj.button1:addEventListener("onClick",
         function (event)
@@ -573,19 +590,7 @@ local function constructNew_frmMonstros()
 
     obj._e_event1 = obj.button2:addEventListener("onClick",
         function (event)
-            local rectangle = GUI.newRectangle()
-                            rectangle.align = "top"
-                            rectangle.height = 30
-                            rectangle.name = "rectTeste"
-                            rectangle.padding = { left = 10, right = 10, top = 5, bottom = 5 }
-                            rectangle.margins = { top = 5 }
-                            rectangle.parent = self.flwDin
-            
-                            local label = GUI.newLabel()
-                            label.text = acoes[i].nome
-                            label.align = "left"
-                            label.width = 220
-                            label.parent = rectangle
+            showMessage("Botão de teste sem função definida.");
         end);
 
     obj._e_event2 = obj.rclMonstros:addEventListener("onSelect",
@@ -593,6 +598,13 @@ local function constructNew_frmMonstros()
             local node = self.rclMonstros.selectedNode
                         self.box.node = node
                         self.box.visible = (node ~= nil)
+            
+                        -- limpa e recria botões sempre que trocar o selecionado
+                        rebuildButtonsFromNode(self, node)
+            
+                        if node ~= nil then
+                            atualizarMana(self)
+                        end
         end);
 
     obj._e_event3 = obj.button3:addEventListener("onClick",
@@ -607,6 +619,51 @@ local function constructNew_frmMonstros()
 
     obj._e_event5 = obj.button5:addEventListener("onClick",
         function (event)
+            rolarSimples(self, "att_for", "FOR")
+        end);
+
+    obj._e_event6 = obj.button6:addEventListener("onClick",
+        function (event)
+            rolarSimples(self, "att_des", "DES")
+        end);
+
+    obj._e_event7 = obj.button7:addEventListener("onClick",
+        function (event)
+            rolarSimples(self, "att_con", "CON")
+        end);
+
+    obj._e_event8 = obj.button8:addEventListener("onClick",
+        function (event)
+            rolarSimples(self, "att_int", "INT")
+        end);
+
+    obj._e_event9 = obj.button9:addEventListener("onClick",
+        function (event)
+            rolarSimples(self, "att_sab", "SAB")
+        end);
+
+    obj._e_event10 = obj.button10:addEventListener("onClick",
+        function (event)
+            rolarSimples(self, "att_car", "CAR")
+        end);
+
+    obj._e_event11 = obj.button11:addEventListener("onClick",
+        function (event)
+            rolarSimples(self, "res_fort", "Fortitude")
+        end);
+
+    obj._e_event12 = obj.button12:addEventListener("onClick",
+        function (event)
+            rolarSimples(self, "res_ref", "Reflexos")
+        end);
+
+    obj._e_event13 = obj.button13:addEventListener("onClick",
+        function (event)
+            rolarSimples(self, "res_von", "Vontade")
+        end);
+
+    obj._e_event14 = obj.button14:addEventListener("onClick",
+        function (event)
             if self.box.node then
                                                 local apagar = self.box.node
                                                 self.box.node = nil
@@ -616,6 +673,15 @@ local function constructNew_frmMonstros()
         end);
 
     function obj:_releaseEvents()
+        __o_rrpgObjs.removeEventListenerById(self._e_event14);
+        __o_rrpgObjs.removeEventListenerById(self._e_event13);
+        __o_rrpgObjs.removeEventListenerById(self._e_event12);
+        __o_rrpgObjs.removeEventListenerById(self._e_event11);
+        __o_rrpgObjs.removeEventListenerById(self._e_event10);
+        __o_rrpgObjs.removeEventListenerById(self._e_event9);
+        __o_rrpgObjs.removeEventListenerById(self._e_event8);
+        __o_rrpgObjs.removeEventListenerById(self._e_event7);
+        __o_rrpgObjs.removeEventListenerById(self._e_event6);
         __o_rrpgObjs.removeEventListenerById(self._e_event5);
         __o_rrpgObjs.removeEventListenerById(self._e_event4);
         __o_rrpgObjs.removeEventListenerById(self._e_event3);
@@ -642,6 +708,7 @@ local function constructNew_frmMonstros()
         if self.layout3 ~= nil then self.layout3:destroy(); self.layout3 = nil; end;
         if self.layout17 ~= nil then self.layout17:destroy(); self.layout17 = nil; end;
         if self.label11 ~= nil then self.label11:destroy(); self.label11 = nil; end;
+        if self.button11 ~= nil then self.button11:destroy(); self.button11 = nil; end;
         if self.edit15 ~= nil then self.edit15:destroy(); self.edit15 = nil; end;
         if self.layout9 ~= nil then self.layout9:destroy(); self.layout9 = nil; end;
         if self.edit8 ~= nil then self.edit8:destroy(); self.edit8 = nil; end;
@@ -655,52 +722,51 @@ local function constructNew_frmMonstros()
         if self.scrollBox1 ~= nil then self.scrollBox1:destroy(); self.scrollBox1 = nil; end;
         if self.rclMonstros ~= nil then self.rclMonstros:destroy(); self.rclMonstros = nil; end;
         if self.label10 ~= nil then self.label10:destroy(); self.label10 = nil; end;
-        if self.edit14 ~= nil then self.edit14:destroy(); self.edit14 = nil; end;
+        if self.button10 ~= nil then self.button10:destroy(); self.button10 = nil; end;
         if self.edit9 ~= nil then self.edit9:destroy(); self.edit9 = nil; end;
-        if self.label22 ~= nil then self.label22:destroy(); self.label22 = nil; end;
+        if self.edit14 ~= nil then self.edit14:destroy(); self.edit14 = nil; end;
         if self.edit2 ~= nil then self.edit2:destroy(); self.edit2 = nil; end;
         if self.layout13 ~= nil then self.layout13:destroy(); self.layout13 = nil; end;
         if self.button4 ~= nil then self.button4:destroy(); self.button4 = nil; end;
         if self.label4 ~= nil then self.label4:destroy(); self.label4 = nil; end;
-        if self.label15 ~= nil then self.label15:destroy(); self.label15 = nil; end;
-        if self.layout5 ~= nil then self.layout5:destroy(); self.layout5 = nil; end;
         if self.edtEquip ~= nil then self.edtEquip:destroy(); self.edtEquip = nil; end;
+        if self.layout5 ~= nil then self.layout5:destroy(); self.layout5 = nil; end;
         if self.button2 ~= nil then self.button2:destroy(); self.button2 = nil; end;
         if self.label2 ~= nil then self.label2:destroy(); self.label2 = nil; end;
-        if self.label13 ~= nil then self.label13:destroy(); self.label13 = nil; end;
         if self.edit13 ~= nil then self.edit13:destroy(); self.edit13 = nil; end;
+        if self.button13 ~= nil then self.button13:destroy(); self.button13 = nil; end;
         if self.rectangle1 ~= nil then self.rectangle1:destroy(); self.rectangle1 = nil; end;
+        if self.label13 ~= nil then self.label13:destroy(); self.label13 = nil; end;
         if self.edit3 ~= nil then self.edit3:destroy(); self.edit3 = nil; end;
         if self.label8 ~= nil then self.label8:destroy(); self.label8 = nil; end;
+        if self.button8 ~= nil then self.button8:destroy(); self.button8 = nil; end;
         if self.layout12 ~= nil then self.layout12:destroy(); self.layout12 = nil; end;
-        if self.label19 ~= nil then self.label19:destroy(); self.label19 = nil; end;
         if self.label5 ~= nil then self.label5:destroy(); self.label5 = nil; end;
-        if self.label14 ~= nil then self.label14:destroy(); self.label14 = nil; end;
         if self.button5 ~= nil then self.button5:destroy(); self.button5 = nil; end;
+        if self.button14 ~= nil then self.button14:destroy(); self.button14 = nil; end;
         if self.layout6 ~= nil then self.layout6:destroy(); self.layout6 = nil; end;
         if self.edit6 ~= nil then self.edit6:destroy(); self.edit6 = nil; end;
         if self.button3 ~= nil then self.button3:destroy(); self.button3 = nil; end;
         if self.label3 ~= nil then self.label3:destroy(); self.label3 = nil; end;
-        if self.label12 ~= nil then self.label12:destroy(); self.label12 = nil; end;
         if self.edit12 ~= nil then self.edit12:destroy(); self.edit12 = nil; end;
-        if self.label20 ~= nil then self.label20:destroy(); self.label20 = nil; end;
+        if self.button12 ~= nil then self.button12:destroy(); self.button12 = nil; end;
+        if self.label12 ~= nil then self.label12:destroy(); self.label12 = nil; end;
         if self.layout1 ~= nil then self.layout1:destroy(); self.layout1 = nil; end;
         if self.label9 ~= nil then self.label9:destroy(); self.label9 = nil; end;
-        if self.label18 ~= nil then self.label18:destroy(); self.label18 = nil; end;
+        if self.button9 ~= nil then self.button9:destroy(); self.button9 = nil; end;
         if self.layout15 ~= nil then self.layout15:destroy(); self.layout15 = nil; end;
         if self.label6 ~= nil then self.label6:destroy(); self.label6 = nil; end;
-        if self.label17 ~= nil then self.label17:destroy(); self.label17 = nil; end;
+        if self.button6 ~= nil then self.button6:destroy(); self.button6 = nil; end;
         if self.scrollBox2 ~= nil then self.scrollBox2:destroy(); self.scrollBox2 = nil; end;
         if self.layout7 ~= nil then self.layout7:destroy(); self.layout7 = nil; end;
         if self.edit7 ~= nil then self.edit7:destroy(); self.edit7 = nil; end;
-        if self.label21 ~= nil then self.label21:destroy(); self.label21 = nil; end;
         if self.edit11 ~= nil then self.edit11:destroy(); self.edit11 = nil; end;
         if self.edtMana ~= nil then self.edtMana:destroy(); self.edtMana = nil; end;
         if self.layout2 ~= nil then self.layout2:destroy(); self.layout2 = nil; end;
         if self.edit1 ~= nil then self.edit1:destroy(); self.edit1 = nil; end;
         if self.layout14 ~= nil then self.layout14:destroy(); self.layout14 = nil; end;
         if self.label7 ~= nil then self.label7:destroy(); self.label7 = nil; end;
-        if self.label16 ~= nil then self.label16:destroy(); self.label16 = nil; end;
+        if self.button7 ~= nil then self.button7:destroy(); self.button7 = nil; end;
         if self.edit16 ~= nil then self.edit16:destroy(); self.edit16 = nil; end;
         self:_oldLFMDestroy();
     end;

@@ -10,62 +10,68 @@
     padding="{left=4, top=4, right=4, bottom=4}">
 
     <script><![CDATA[
-        local ndb = require("ndb")
+        local ndb      = require("ndb")
+        local Firecast = require("firecast")
 
-        -- Mostrar Mana apenas se o node tiver esse campo
+        ----------------------------------------------------------------
+        -- Mostra/esconde mana (se quiser customizar depois)
+        ----------------------------------------------------------------
         function atualizarMana(self)
-            local sheet = self.sheet
-            if sheet == nil then return end
+            local node = (self.box and self.box.node) or self.sheet
+            if node == nil then return end
 
-            if sheet.mana == nil or sheet.mana == "" then
-                self.edtMana.visible = false
-            else
+            if self.edtMana ~= nil then
                 self.edtMana.visible = true
             end
         end
 
-        function copilarFicha(form)
-            local node = form.box.node
-            rebuildDynamicButtons(self.frmMonstros, node, sheet.dataIA)
+        ----------------------------------------------------------------
+        -- Recompila os botões dinâmicos a partir do node atual
+        ----------------------------------------------------------------
+        function copilarFicha(self)
+            local node = self.box and self.box.node
+            rebuildButtonsFromNode(self, node)
         end
 
-        -- Eventos de atualização
+        ----------------------------------------------------------------
+        -- Rolagem simples 1d20 + campo (usa SEMPRE o monstro selecionado)
+        ----------------------------------------------------------------
+        function rolarSimples(self, campo, rotulo)
+            local node = (self.box and self.box.node) or self.sheet
+            if node == nil then return end
+
+            local mesa = Firecast.getMesaDe(self)
+            if not mesa or not mesa.activeChat then
+                showMessage("Chat não encontrado.")
+                return
+            end
+
+            local chat = mesa.activeChat
+            local mod  = tonumber(node[campo]) or 0
+            local nome = node.nome or "Criatura"
+
+            chat:rolarDados("1d20+" .. mod, rotulo .. " (" .. nome .. ")")
+        end
+
+        ----------------------------------------------------------------
+        -- Chamado quando a ficha é carregada
+        ----------------------------------------------------------------
         function onNodeReady(self)
             atualizarMana(self)
-
-            if self.sheet ~= nil then
-                self.sheet:addEventListener("onChanged",
-                    function(_, field)
-                        if field == "mana" then
-                            atualizarMana(self)
-                        end
-                    end)
-            end
         end
     ]]></script>
 
-    <!-- BOTÃO NOVO MONSTRO -->
+    <!-- BOTÃO NOVO MONSTRO / TESTE -->
     <layout align="top" height="30" margins="{bottom=4}">
         <button text="Novo Monstro" width="120" align="left">
             <event name="onClick">
                 self.rclMonstros:append();
             </event>
         </button>
+
         <button text="TESTE" width="120" align="left">
             <event name="onClick">
-                local rectangle = GUI.newRectangle()
-                rectangle.align = "top"
-                rectangle.height = 30
-                rectangle.name = "rectTeste"
-                rectangle.padding = { left = 10, right = 10, top = 5, bottom = 5 }
-                rectangle.margins = { top = 5 }
-                rectangle.parent = self.flwDin
-
-                local label = GUI.newLabel()
-                label.text = acoes[i].nome
-                label.align = "left"
-                label.width = 220
-                label.parent = rectangle
+                showMessage("Botão de teste sem função definida.");
             </event>
         </button>
     </layout>
@@ -83,6 +89,13 @@
             local node = self.rclMonstros.selectedNode
             self.box.node = node
             self.box.visible = (node ~= nil)
+
+            -- limpa e recria botões sempre que trocar o selecionado
+            rebuildButtonsFromNode(self, node)
+
+            if node ~= nil then
+                atualizarMana(self)
+            end
         </event>
     </recordList>
 
@@ -123,7 +136,7 @@
                             onClick="copilarFicha(self)" />
                     </layout>
 
-                    <!-- BASICOS -->
+                    <!-- CAMPOS BÁSICOS -->
                     <layout align="top" height="30" margins="{top=4}">
                         <label align="left" width="50" text="Nome:" />
                         <edit align="left" width="300" field="nome" />
@@ -158,44 +171,80 @@
                         <edit align="left" width="120" field="deslocamento" />
                     </layout>
 
-                    <!-- ATRIBUTOS -->
+                    <!-- ATRIBUTOS (labels = botões) -->
                     <layout align="top" height="20" margins="{top=6}">
                         <label text="Atributos:" align="left" width="200" />
                     </layout>
 
                     <layout align="top" height="30">
-                        <label text="FOR" align="left" width="30" />
+                        <button text="FOR" align="left" width="30">
+                            <event name="onClick">
+                                rolarSimples(self, "att_for", "FOR")
+                            </event>
+                        </button>
                         <edit field="att_for" align="left" width="40" margins="{left=2, right=8}" />
 
-                        <label text="DES" align="left" width="30" />
+                        <button text="DES" align="left" width="30">
+                            <event name="onClick">
+                                rolarSimples(self, "att_des", "DES")
+                            </event>
+                        </button>
                         <edit field="att_des" align="left" width="40" margins="{left=2, right=8}" />
 
-                        <label text="CON" align="left" width="30" />
+                        <button text="CON" align="left" width="30">
+                            <event name="onClick">
+                                rolarSimples(self, "att_con", "CON")
+                            </event>
+                        </button>
                         <edit field="att_con" align="left" width="40" margins="{left=2, right=8}" />
 
-                        <label text="INT" align="left" width="30" />
+                        <button text="INT" align="left" width="30">
+                            <event name="onClick">
+                                rolarSimples(self, "att_int", "INT")
+                            </event>
+                        </button>
                         <edit field="att_int" align="left" width="40" margins="{left=2, right=8}" />
 
-                        <label text="SAB" align="left" width="30" />
+                        <button text="SAB" align="left" width="30">
+                            <event name="onClick">
+                                rolarSimples(self, "att_sab", "SAB")
+                            </event>
+                        </button>
                         <edit field="att_sab" align="left" width="40" margins="{left=2, right=8}" />
 
-                        <label text="CAR" align="left" width="30" />
+                        <button text="CAR" align="left" width="30">
+                            <event name="onClick">
+                                rolarSimples(self, "att_car", "CAR")
+                            </event>
+                        </button>
                         <edit field="att_car" align="left" width="40" margins="{left=2}" />
                     </layout>
 
-                    <!-- RESISTENCIAS -->
+                    <!-- RESISTÊNCIAS (labels = botões) -->
                     <layout align="top" height="20" margins="{top=8}">
                         <label text="Resistências:" align="left" width="200" />
                     </layout>
 
                     <layout align="top" height="30">
-                        <label text="Fort:" align="left" width="40" />
+                        <button text="Fort" align="left" width="40">
+                            <event name="onClick">
+                                rolarSimples(self, "res_fort", "Fortitude")
+                            </event>
+                        </button>
                         <edit field="res_fort" align="left" width="50" margins="{left=2, right=15}" />
 
-                        <label text="Ref:" align="left" width="40" />
+                        <button text="Ref" align="left" width="40">
+                            <event name="onClick">
+                                rolarSimples(self, "res_ref", "Reflexos")
+                            </event>
+                        </button>
                         <edit field="res_ref" align="left" width="50" margins="{left=2, right=15}" />
 
-                        <label text="Von:" align="left" width="40" />
+                        <button text="Von" align="left" width="40">
+                            <event name="onClick">
+                                rolarSimples(self, "res_von", "Vontade")
+                            </event>
+                        </button>
                         <edit field="res_von" align="left" width="50" margins="{left=2}" />
                     </layout>
 
