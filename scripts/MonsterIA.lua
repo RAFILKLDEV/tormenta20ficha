@@ -440,5 +440,7 @@ function addRectangle(flw, texto, data)
         end
     end
 
+    flw:needRepaint();
+
     return rectangle
 end

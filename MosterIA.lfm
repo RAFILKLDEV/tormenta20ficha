@@ -131,11 +131,6 @@
                         </button>
                     </layout>
 
-                    <layout align="top" height="50">
-                        <button text="Copilar Ficha" align="left" width="120"
-                            onClick="copilarFicha(self)" />
-                    </layout>
-
                     <!-- CAMPOS BÁSICOS -->
                     <layout align="top" height="30" margins="{top=4}">
                         <label align="left" width="50" text="Nome:" />
@@ -177,42 +172,42 @@
                     </layout>
 
                     <layout align="top" height="30">
-                        <button text="FOR" align="left" width="30">
+                        <button text="FOR" align="left" width="50">
                             <event name="onClick">
                                 rolarSimples(self, "att_for", "FOR")
                             </event>
                         </button>
                         <edit field="att_for" align="left" width="40" margins="{left=2, right=8}" />
 
-                        <button text="DES" align="left" width="30">
+                        <button text="DES" align="left" width="50">
                             <event name="onClick">
                                 rolarSimples(self, "att_des", "DES")
                             </event>
                         </button>
                         <edit field="att_des" align="left" width="40" margins="{left=2, right=8}" />
 
-                        <button text="CON" align="left" width="30">
+                        <button text="CON" align="left" width="50">
                             <event name="onClick">
                                 rolarSimples(self, "att_con", "CON")
                             </event>
                         </button>
                         <edit field="att_con" align="left" width="40" margins="{left=2, right=8}" />
 
-                        <button text="INT" align="left" width="30">
+                        <button text="INT" align="left" width="50">
                             <event name="onClick">
                                 rolarSimples(self, "att_int", "INT")
                             </event>
                         </button>
                         <edit field="att_int" align="left" width="40" margins="{left=2, right=8}" />
 
-                        <button text="SAB" align="left" width="30">
+                        <button text="SAB" align="left" width="50">
                             <event name="onClick">
                                 rolarSimples(self, "att_sab", "SAB")
                             </event>
                         </button>
                         <edit field="att_sab" align="left" width="40" margins="{left=2, right=8}" />
 
-                        <button text="CAR" align="left" width="30">
+                        <button text="CAR" align="left" width="50">
                             <event name="onClick">
                                 rolarSimples(self, "att_car", "CAR")
                             </event>
@@ -253,13 +248,11 @@
                         <label text="Ações / Rolagens:" align="left" width="200" />
                     </layout>
 
-                    <layout align="top" height="200" margins="{bottom=8}">
                         <flowLayout name="flwDin"
-                            align="left"
-                            width="900"
+                            align="top"
                             maxControlsPerLine="3"
+                            autoHeight="true"
                             minWidth="150" />
-                    </layout>
 
                     <!-- EQUIPAMENTOS -->
                     <layout align="top" height="20" margins="{top=8}">
