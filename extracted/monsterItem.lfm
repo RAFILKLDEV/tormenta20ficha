@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<form name="frmMonstroItem" height="50" width="180">
+
+    <layout align="client" margins="{left=4, right=4, top=4, bottom=4}">
+
+        <button width="32" align="left" text="X" fontColor="#FF4444">
+            <event name="onClick">
+                ndb.deleteNode(sheet)
+            </event>
+        </button>
+
+        <label align="client" field="nome" text="(Sem Nome)" margins="{left=4}"/>
+    </layout>
+
+</form>

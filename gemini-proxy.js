@@ -1,18 +1,56 @@
 // index.js - Proxy Gemini → Firecast (somente XML de criatura)
 
 const express = require("express");
+const fs = require("fs");
+const path = require("path");
 
 const app = express();
 app.use(express.json({ limit: "10mb" }));
 
 // SUA API KEY
-const API_KEY = "AIzaSyDrmL6DM1mTS2hTuKMa6_UbZgtsCvWcZxQ";
+const API_KEY = "AIzaSyCzyz54cirV1USc0oCEmDKv9AruoA76k1c";
+
+// Config de integração com o SAO-NODE (busca de monstros já cadastrados).
+// SAO_NODE_SESSION_COOKIE deve ser o valor do cookie de sessão (sao_session=...)
+// de um usuário com papel de mestre na campanha usada.
+const SAO_NODE_BASE_URL = process.env.SAO_NODE_BASE_URL || "http://localhost:3001";
+const SAO_NODE_SESSION_COOKIE = process.env.SAO_NODE_SESSION_COOKIE || "";
 
 console.log("====================================");
 console.log(" Proxy Gemini Iniciado ");
 console.log(" API_KEY carregada? ", API_KEY ? "SIM" : "NÃO");
+console.log(" SAO_NODE_SESSION_COOKIE carregado? ", SAO_NODE_SESSION_COOKIE ? "SIM" : "NÃO");
 console.log("====================================");
 
+
+function xmlError(res, status, code) {
+    return res.status(status)
+        .set("Content-Type", "application/xml; charset=utf-8")
+        .send(`<erro codigo="${code}">${code}</erro>`);
+}
+
+function classifyGeminiError(response, data) {
+    const status = response?.status || 500;
+    const apiStatus = data?.error?.status || "";
+
+    if (status === 401 || status === 403 || apiStatus === "PERMISSION_DENIED" || apiStatus === "UNAUTHENTICATED") {
+        return "gemini_auth";
+    }
+
+    if (status === 429 || apiStatus === "RESOURCE_EXHAUSTED") {
+        return "gemini_quota";
+    }
+
+    if (status === 503 || apiStatus === "UNAVAILABLE") {
+        return "gemini_indisponivel";
+    }
+
+    if (apiStatus === "FAILED_PRECONDITION") {
+        return "gemini_bloqueado";
+    }
+
+    return "gemini_api";
+}
 
 app.post("/gemini", async (req, res) => {
     try {
@@ -21,9 +59,7 @@ app.post("/gemini", async (req, res) => {
         const userPrompt = req.body.prompt;
 
         if (!userPrompt || typeof userPrompt !== "string") {
-            return res.status(400)
-                .set("Content-Type", "application/xml; charset=utf-8")
-                .send("<erro>prompt_ausente</erro>");
+            return xmlError(res, 400, "prompt_ausente");
         }
 
         console.log("📨 Prompt recebido:");
@@ -51,7 +87,7 @@ TODAS as tags devem ser SEMPRE preenchidas.
     </atributos>
 
     <pv></pv>
-    <ca></ca>
+    <defesa></defesa>
     <deslocamento></deslocamento>
 
     <defesas>
@@ -83,6 +119,7 @@ TODAS as tags devem ser SEMPRE preenchidas.
     <ataques>
         <item>
             <nome></nome>
+            <quantidade></quantidade>
             <bonus></bonus>
             <dano></dano>
             <tipo></tipo>
@@ -101,7 +138,9 @@ REGRAS IMPORTANTES:
 1. NÃO use markdown.
 2. NÃO coloque explicações.
 3. NÃO coloque nada fora do <criatura>.
-4. Sempre preencha todas as tags, mesmo que seja "0" ou "nenhum".
+4. Use <defesa> para o valor de Defesa da criatura.
+5. Sempre preencha todas as tags, mesmo que seja "0" ou "nenhum".
+6. Em cada <ataques><item>, preencha <quantidade> com quantos ataques essa acao faz (ex.: "1", "2", "3"). Se for apenas um, use "1".
 `;
 
         // ===================================================
@@ -137,14 +176,18 @@ REGRAS IMPORTANTES:
         console.log("📥 Resposta COMPLETA do Gemini:");
         console.log(JSON.stringify(data, null, 2));
 
+        if (!response.ok || data?.error) {
+            const code = classifyGeminiError(response, data);
+            console.log("Erro classificado para o Firecast:", code);
+            return xmlError(res, response.status || 500, code);
+        }
+
         const part =
             data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
         if (!part) {
             console.log("⚠ ERRO: Gemini não retornou texto.");
-            return res.status(500)
-                .set("Content-Type", "application/xml; charset=utf-8")
-                .send("<erro>gemini_sem_texto</erro>");
+            return xmlError(res, 502, "gemini_sem_texto");
         }
 
         // Remover markdown
@@ -156,6 +199,11 @@ REGRAS IMPORTANTES:
         // Extrair somente o bloco <criatura>
         const start = text.indexOf("<criatura>");
         const end = text.indexOf("</criatura>");
+
+        if (start === -1 || end === -1) {
+            console.log("Resposta veio sem o XML completo.");
+            return xmlError(res, 502, "gemini_sem_xml");
+        }
 
         if (start !== -1 && end !== -1) {
             text = text.slice(start, end + "</criatura>".length);
@@ -173,9 +221,88 @@ REGRAS IMPORTANTES:
 
     } catch (err) {
         console.error("🔥 ERRO NO PROXY:", err);
-        return res.status(500)
+        return xmlError(res, 500, "proxy_erro");
+    }
+});
+
+// Busca o XML <criatura> de um monstro já cadastrado no SAO-NODE,
+// evitando a necessidade de reescrever o texto e reenviar para a IA.
+app.get("/sao-node/monster-xml", async (req, res) => {
+    try {
+        const campaignId = req.query.campaignId;
+        const monsterId = req.query.monsterId;
+
+        if (!campaignId || !monsterId) {
+            return xmlError(res, 400, "parametros_ausentes");
+        }
+        if (!SAO_NODE_SESSION_COOKIE) {
+            console.log("⚠ SAO_NODE_SESSION_COOKIE não configurado no proxy.");
+            return xmlError(res, 500, "sao_node_sem_sessao");
+        }
+
+        const url = `${SAO_NODE_BASE_URL}/api/v1/campaigns/${encodeURIComponent(campaignId)}/monsters/${encodeURIComponent(monsterId)}/firecast.xml`;
+
+        console.log("🔎 Buscando monstro no SAO-NODE:", url);
+
+        const response = await fetch(url, {
+            method: "GET",
+            headers: { cookie: SAO_NODE_SESSION_COOKIE }
+        });
+
+        if (response.status === 401 || response.status === 403) {
+            return xmlError(res, response.status, "sao_node_nao_autorizado");
+        }
+        if (response.status === 404) {
+            return xmlError(res, 404, "sao_node_monstro_nao_encontrado");
+        }
+        if (!response.ok) {
+            return xmlError(res, response.status || 502, "sao_node_erro");
+        }
+
+        const xml = await response.text();
+
+        console.log("📝 XML recebido do SAO-NODE:");
+        console.log(xml);
+
+        return res.status(200)
             .set("Content-Type", "application/xml; charset=utf-8")
-            .send(`<erro>${err.message}</erro>`);
+            .send(xml);
+    } catch (err) {
+        console.error("🔥 ERRO AO BUSCAR MONSTRO NO SAO-NODE:", err);
+        return xmlError(res, 500, "sao_node_proxy_erro");
+    }
+});
+
+app.post("/save-ficha", async (req, res) => {
+    try {
+        const ficha = req.body?.ficha;
+
+        if (!ficha || typeof ficha !== "object") {
+            return res.status(400).json({ error: "ficha_ausente" });
+        }
+
+        const rawName = String(ficha.nome || "criatura").trim();
+        const slug = rawName
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "") || "criatura";
+
+        const saveDir = path.resolve(process.cwd(), "saved-fichas");
+        const filePath = path.join(saveDir, `${slug}.json`);
+
+        fs.mkdirSync(saveDir, { recursive: true });
+        fs.writeFileSync(filePath, JSON.stringify(ficha, null, 2), "utf8");
+
+        return res.status(200).json({
+            ok: true,
+            fileName: path.basename(filePath),
+            filePath
+        });
+    } catch (err) {
+        console.error("ERRO AO SALVAR FICHA:", err);
+        return res.status(500).json({ error: err.message });
     }
 });
 

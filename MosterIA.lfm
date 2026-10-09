@@ -26,7 +26,7 @@
         end
 
         ----------------------------------------------------------------
-        -- Recompila os botões dinâmicos a partir do node atual
+        -- Recompila os botoes dinamicos a partir do node atual
         ----------------------------------------------------------------
         function copilarFicha(self)
             local node = self.box and self.box.node
@@ -42,7 +42,7 @@
 
             local mesa = Firecast.getMesaDe(self)
             if not mesa or not mesa.activeChat then
-                showMessage("Chat não encontrado.")
+                showMessage("Chat nao encontrado.")
                 return
             end
 
@@ -50,18 +50,21 @@
             local mod  = tonumber(node[campo]) or 0
             local nome = node.nome or "Criatura"
 
-            chat:rolarDados("1d20+" .. mod, rotulo .. " (" .. nome .. ")")
+            rolarExpressaoComoNpc(chat, node, rotulo .. " (" .. nome .. ")", "1d20+" .. mod, self, {
+                name = node.nome,
+                avatar = node.imagemURL
+            })
         end
 
         ----------------------------------------------------------------
-        -- Chamado quando a ficha é carregada
+        -- Chamado quando a ficha e carregada
         ----------------------------------------------------------------
         function onNodeReady(self)
             atualizarMana(self)
         end
     ]]></script>
 
-    <!-- BOTÃO NOVO MONSTRO / TESTE -->
+    <!-- BOTAO NOVO MONSTRO / TESTE -->
     <layout align="top" height="30" margins="{bottom=4}">
         <button text="Novo Monstro" width="120" align="left">
             <event name="onClick">
@@ -71,7 +74,7 @@
 
         <button text="TESTE" width="120" align="left">
             <event name="onClick">
-                showMessage("Botão de teste sem função definida.");
+                showMessage("Botao de teste sem funcao definida.");
             </event>
         </button>
     </layout>
@@ -90,7 +93,7 @@
             self.box.node = node
             self.box.visible = (node ~= nil)
 
-            -- limpa e recria botões sempre que trocar o selecionado
+            -- limpa e recria botoes sempre que trocar o selecionado
             rebuildButtonsFromNode(self, node)
 
             if node ~= nil then
@@ -113,11 +116,13 @@
 
                     <!-- TEXTO PARA IA -->
                     <layout align="top" height="20">
-                        <label text="Texto para IA:" align="left" width="200" />
+                        <label text="Texto para IA:" align="left" width="450" />
+                        <label text="Como jogar:" align="left" width="450" margins="{left=12}" />
                     </layout>
 
                     <layout align="top" height="120">
-                        <textEditor name="edtTextoIA" field="textoBrutoIA" align="left" width="900" />
+                        <textEditor name="edtTextoIA" field="textoBrutoIA" align="left" width="450" />
+                        <textEditor name="edtComoJogar" field="comoJogar" align="left" width="450" margins="{left=12}" readOnly="true" />
                     </layout>
 
                     <!-- IA -->
@@ -129,9 +134,63 @@
                                 askAndCallIA(self, self.box.node)
                             </event>
                         </button>
+
+                        <button text="Aplicar no Token"
+                            align="left" width="180"
+                            margins="{left=8}"
+                            fontColor="#66CCFF">
+                            <event name="onClick">
+                                aplicarFichaNoTokenSelecionado(self.box.node)
+                            </event>
+                        </button>
+
+                        <button text="Salvar Ficha"
+                            align="left" width="150"
+                            margins="{left=8}"
+                            fontColor="#FFD166">
+                            <event name="onClick">
+                                salvarFichaLocalmente(self.box.node)
+                            </event>
+                        </button>
                     </layout>
 
-                    <!-- CAMPOS BÁSICOS -->
+                    <!-- BUSCAR MONSTRO JA CADASTRADO NO SAO-NODE -->
+                    <layout align="top" height="20" margins="{top=4}">
+                        <label text="Campanha (SAO-NODE):" align="left" width="180" />
+                        <label text="ID do monstro (SAO-NODE):" align="left" width="180" margins="{left=8}" />
+                    </layout>
+
+                    <layout align="top" height="30" margins="{bottom=4}">
+                        <edit name="edtSaoNodeCampaignId" align="left" width="180" field="saoNodeCampaignId" />
+                        <edit name="edtSaoNodeMonsterId" align="left" width="180" margins="{left=8}" field="saoNodeMonsterId" />
+
+                        <button text="Buscar do SAO-NODE"
+                            align="left" width="180"
+                            margins="{left=8}"
+                            fontColor="#00FFAA">
+                            <event name="onClick">
+                                askSaoNodeAndFill(self, self.box.node)
+                            </event>
+                        </button>
+                    </layout>
+
+                    <!-- CAMPOS BASICOS -->
+                    <layout align="top" height="20" margins="{top=4}">
+                        <label align="left" width="90" text="Imagem URL:" />
+                        <edit align="left" width="520" field="imagemURL" />
+                    </layout>
+
+                    <layout align="top" height="140" margins="{top=4, bottom=4}">
+                        <image field="imagemURL"
+                            align="left"
+                            width="140"
+                            height="140"
+                            editable="true"
+                            style="autoFit"
+                            center="true"
+                            showProgress="true" />
+                    </layout>
+
                     <layout align="top" height="30" margins="{top=4}">
                         <label align="left" width="50" text="Nome:" />
                         <edit align="left" width="300" field="nome" />
@@ -159,14 +218,14 @@
                             field="mana"
                             visible="true" />
 
-                        <label align="left" width="50" text="CA:" margins="{left=10}" />
+                        <label align="left" width="50" text="Defesa:" margins="{left=10}" />
                         <edit align="left" width="60" field="ca" />
 
                         <label align="left" width="110" text="Deslocamento:" margins="{left=10}" />
                         <edit align="left" width="120" field="deslocamento" />
                     </layout>
 
-                    <!-- ATRIBUTOS (labels = botões) -->
+                    <!-- ATRIBUTOS (labels = botoes) -->
                     <layout align="top" height="20" margins="{top=6}">
                         <label text="Atributos:" align="left" width="200" />
                     </layout>
@@ -215,9 +274,9 @@
                         <edit field="att_car" align="left" width="40" margins="{left=2}" />
                     </layout>
 
-                    <!-- RESISTÊNCIAS (labels = botões) -->
+                    <!-- RESISTENCIAS (labels = botoes) -->
                     <layout align="top" height="20" margins="{top=8}">
-                        <label text="Resistências:" align="left" width="200" />
+                        <label text="Resistencias:" align="left" width="200" />
                     </layout>
 
                     <layout align="top" height="30">
@@ -243,9 +302,9 @@
                         <edit field="res_von" align="left" width="50" margins="{left=2}" />
                     </layout>
 
-                    <!-- AÇÕES -->
+                    <!-- ACOES / ROLAGENS -->
                     <layout align="top" height="20" margins="{top=8}">
-                        <label text="Ações / Rolagens:" align="left" width="200" />
+                        <label text="Acoes / Rolagens:" align="left" width="200" />
                     </layout>
 
                         <flowLayout name="flwDin"

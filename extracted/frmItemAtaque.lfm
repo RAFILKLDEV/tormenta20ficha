@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<form name="frmItemAtaque" width="350" height="60" theme="dark">
+    
+    <layout align="client">
+        
+        <edit name="edtNome" field="nome"
+              width="120"
+              vertTextAlign="center"
+              hint="Nome do ataque"/>
+        
+        <edit name="edtBonus" field="bonus"
+              width="40"
+              margins="{left=4}"
+              vertTextAlign="center"
+              hint="Bônus"/>
+
+        <edit name="edtDano" field="dano"
+              width="100"
+              margins="{left=4}"
+              vertTextAlign="center"
+              hint="Dano"/>
+
+        <edit name="edtTipo" field="tipo"
+              width="80"
+              margins="{left=4}"
+              vertTextAlign="center"
+              hint="Tipo"/>
+
+        <button text="X"
+                width="22"
+                align="right"
+                margins="{left=4}"
+                vertTextAlign="center">
+            <event name="onClick">
+                ndb.deleteNode(self.sheet)
+            </event>
+        </button>
+    </layout>
+
+</form>
