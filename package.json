@@ -6,7 +6,8 @@
   "main": "gemini-proxy.js",
   "type": "commonjs",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "start": "node --env-file-if-exists=.env gemini-proxy.js"
   },
   "license": "ISC",
   "dependencies": {

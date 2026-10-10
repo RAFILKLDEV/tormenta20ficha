@@ -11,7 +11,7 @@ local Firecast = require("firecast")
 local rrpg     = require("rrpg")
 local SceneLib = require("scene")
 
-GEMINI_PROXY_URL = GEMINI_PROXY_URL or "http://localhost:3000/gemini"
+GEMINI_PROXY_URL = GEMINI_PROXY_URL or "http://localhost:7000/gemini"
 
 ------------------------------------------------------------
 -- UTILS
@@ -1513,7 +1513,7 @@ function salvarFichaLocalmente(nodo)
     local body = json.encode({ ficha = buildFichaSavePayload(nodo) })
 
     httpPOST(
-        "http://localhost:3000/save-ficha",
+        "http://localhost:7000/save-ficha",
         body,
         function(responseText)
             local ok, payload = pcall(function() return json.decode(responseText) end)

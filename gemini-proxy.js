@@ -480,10 +480,25 @@ app.post("/save-ficha", async (req, res) => {
 });
 
 
-if (require.main === module) app.listen(Number(process.env.PORT || 3000), () => {
-    console.log("====================================");
-    console.log("🚀 Gemini Proxy rodando na porta 3000");
-    console.log("====================================");
-});
+if (require.main === module) {
+    const port = Number(process.env.PORT || 7000);
+    const server = app.listen(port);
+    server.once("listening", () => {
+        const address = server.address();
+        const actualPort = typeof address === "object" && address !== null ? address.port : port;
+        console.log("====================================");
+        console.log(`🚀 Gemini Proxy rodando na porta ${actualPort}`);
+        console.log("====================================");
+    });
+
+    server.once("error", (error) => {
+        if (error.code === "EADDRINUSE") {
+            console.error(`A porta ${port} já está em uso. Feche o outro servidor ou defina PORT com outra porta.`);
+        } else {
+            console.error("Não foi possível iniciar o proxy:", error.message);
+        }
+        process.exit(1);
+    });
+}
 
 module.exports = { app, transfers, cleanupTransfers };

@@ -7,7 +7,7 @@
         <description>Plugin para Mesa do Rafilkl =)</description>
         <author>RAFILKL</author>
         <contact>https://github.com/RAFILKLDEV</contact>
-        <site>http://www.seu.site.com.br</site>
+        <site>https://github.com/RAFILKLDEV/tormenta20ficha</site>
     </info>
     <script>scripts/json.lua</script>
     <script>scripts/MonsterIA.lua</script>

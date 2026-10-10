@@ -87,7 +87,9 @@ local function constructNew_frmMonstros()
         ----------------------------------------------------------------
         function onNodeReady(self)
             atualizarMana(self)
+            iniciarRecepcaoSaoNode(self)
         end
+
     
 
 
@@ -231,27 +233,89 @@ local function constructNew_frmMonstros()
 
     obj.label3 = GUI.fromHandle(_obj_newObject("label"));
     obj.label3:setParent(obj.layout5);
+    obj.label3:setText("Campanha (SAO-NODE):");
     obj.label3:setAlign("left");
-    obj.label3:setWidth(90);
-    obj.label3:setText("Imagem URL:");
+    obj.label3:setWidth(180);
     obj.label3:setName("label3");
 
+    obj.label4 = GUI.fromHandle(_obj_newObject("label"));
+    obj.label4:setParent(obj.layout5);
+    obj.label4:setText("ID do monstro (SAO-NODE):");
+    obj.label4:setAlign("left");
+    obj.label4:setWidth(180);
+    obj.label4:setMargins({left=8});
+    obj.label4:setName("label4");
+
+    obj.layout6 = GUI.fromHandle(_obj_newObject("layout"));
+    obj.layout6:setParent(obj.scrollBox2);
+    obj.layout6:setAlign("top");
+    obj.layout6:setHeight(30);
+    obj.layout6:setMargins({bottom=4});
+    obj.layout6:setName("layout6");
+
+    obj.edtSaoNodeCampaignId = GUI.fromHandle(_obj_newObject("edit"));
+    obj.edtSaoNodeCampaignId:setParent(obj.layout6);
+    obj.edtSaoNodeCampaignId:setName("edtSaoNodeCampaignId");
+    obj.edtSaoNodeCampaignId:setAlign("left");
+    obj.edtSaoNodeCampaignId:setWidth(180);
+    obj.edtSaoNodeCampaignId:setField("saoNodeCampaignId");
+
+    obj.edtSaoNodeMonsterId = GUI.fromHandle(_obj_newObject("edit"));
+    obj.edtSaoNodeMonsterId:setParent(obj.layout6);
+    obj.edtSaoNodeMonsterId:setName("edtSaoNodeMonsterId");
+    obj.edtSaoNodeMonsterId:setAlign("left");
+    obj.edtSaoNodeMonsterId:setWidth(180);
+    obj.edtSaoNodeMonsterId:setMargins({left=8});
+    obj.edtSaoNodeMonsterId:setField("saoNodeMonsterId");
+
+    obj.button6 = GUI.fromHandle(_obj_newObject("button"));
+    obj.button6:setParent(obj.layout6);
+    obj.button6:setText("Buscar do SAO-NODE");
+    obj.button6:setAlign("left");
+    obj.button6:setWidth(180);
+    obj.button6:setMargins({left=8});
+    obj.button6:setFontColor("#00FFAA");
+    obj.button6:setName("button6");
+
+    obj.button7 = GUI.fromHandle(_obj_newObject("button"));
+    obj.button7:setParent(obj.layout6);
+    obj.button7:setText("Receber do SAO-NODE");
+    obj.button7:setAlign("left");
+    obj.button7:setWidth(190);
+    obj.button7:setMargins({left=8});
+    obj.button7:setFontColor("#66CCFF");
+    obj.button7:setName("button7");
+
+    obj.layout7 = GUI.fromHandle(_obj_newObject("layout"));
+    obj.layout7:setParent(obj.scrollBox2);
+    obj.layout7:setAlign("top");
+    obj.layout7:setHeight(20);
+    obj.layout7:setMargins({top=4});
+    obj.layout7:setName("layout7");
+
+    obj.label5 = GUI.fromHandle(_obj_newObject("label"));
+    obj.label5:setParent(obj.layout7);
+    obj.label5:setAlign("left");
+    obj.label5:setWidth(90);
+    obj.label5:setText("Imagem URL:");
+    obj.label5:setName("label5");
+
     obj.edit1 = GUI.fromHandle(_obj_newObject("edit"));
-    obj.edit1:setParent(obj.layout5);
+    obj.edit1:setParent(obj.layout7);
     obj.edit1:setAlign("left");
     obj.edit1:setWidth(520);
     obj.edit1:setField("imagemURL");
     obj.edit1:setName("edit1");
 
-    obj.layout6 = GUI.fromHandle(_obj_newObject("layout"));
-    obj.layout6:setParent(obj.scrollBox2);
-    obj.layout6:setAlign("top");
-    obj.layout6:setHeight(140);
-    obj.layout6:setMargins({top=4, bottom=4});
-    obj.layout6:setName("layout6");
+    obj.layout8 = GUI.fromHandle(_obj_newObject("layout"));
+    obj.layout8:setParent(obj.scrollBox2);
+    obj.layout8:setAlign("top");
+    obj.layout8:setHeight(140);
+    obj.layout8:setMargins({top=4, bottom=4});
+    obj.layout8:setName("layout8");
 
     obj.image1 = GUI.fromHandle(_obj_newObject("image"));
-    obj.image1:setParent(obj.layout6);
+    obj.image1:setParent(obj.layout8);
     obj.image1:setField("imagemURL");
     obj.image1:setAlign("left");
     obj.image1:setWidth(140);
@@ -262,78 +326,6 @@ local function constructNew_frmMonstros()
     obj.image1:setShowProgress(true);
     obj.image1:setName("image1");
 
-    obj.layout7 = GUI.fromHandle(_obj_newObject("layout"));
-    obj.layout7:setParent(obj.scrollBox2);
-    obj.layout7:setAlign("top");
-    obj.layout7:setHeight(30);
-    obj.layout7:setMargins({top=4});
-    obj.layout7:setName("layout7");
-
-    obj.label4 = GUI.fromHandle(_obj_newObject("label"));
-    obj.label4:setParent(obj.layout7);
-    obj.label4:setAlign("left");
-    obj.label4:setWidth(50);
-    obj.label4:setText("Nome:");
-    obj.label4:setName("label4");
-
-    obj.edit2 = GUI.fromHandle(_obj_newObject("edit"));
-    obj.edit2:setParent(obj.layout7);
-    obj.edit2:setAlign("left");
-    obj.edit2:setWidth(300);
-    obj.edit2:setField("nome");
-    obj.edit2:setName("edit2");
-
-    obj.layout8 = GUI.fromHandle(_obj_newObject("layout"));
-    obj.layout8:setParent(obj.scrollBox2);
-    obj.layout8:setAlign("top");
-    obj.layout8:setHeight(30);
-    obj.layout8:setName("layout8");
-
-    obj.label5 = GUI.fromHandle(_obj_newObject("label"));
-    obj.label5:setParent(obj.layout8);
-    obj.label5:setAlign("left");
-    obj.label5:setWidth(50);
-    obj.label5:setText("ND:");
-    obj.label5:setName("label5");
-
-    obj.edit3 = GUI.fromHandle(_obj_newObject("edit"));
-    obj.edit3:setParent(obj.layout8);
-    obj.edit3:setAlign("left");
-    obj.edit3:setWidth(50);
-    obj.edit3:setField("nd");
-    obj.edit3:setMargins({left=4});
-    obj.edit3:setName("edit3");
-
-    obj.label6 = GUI.fromHandle(_obj_newObject("label"));
-    obj.label6:setParent(obj.layout8);
-    obj.label6:setAlign("left");
-    obj.label6:setWidth(50);
-    obj.label6:setText("Tipo:");
-    obj.label6:setMargins({left=10});
-    obj.label6:setName("label6");
-
-    obj.edit4 = GUI.fromHandle(_obj_newObject("edit"));
-    obj.edit4:setParent(obj.layout8);
-    obj.edit4:setAlign("left");
-    obj.edit4:setWidth(120);
-    obj.edit4:setField("tipo");
-    obj.edit4:setName("edit4");
-
-    obj.label7 = GUI.fromHandle(_obj_newObject("label"));
-    obj.label7:setParent(obj.layout8);
-    obj.label7:setAlign("left");
-    obj.label7:setWidth(100);
-    obj.label7:setText("Tamanho:");
-    obj.label7:setMargins({left=10});
-    obj.label7:setName("label7");
-
-    obj.edit5 = GUI.fromHandle(_obj_newObject("edit"));
-    obj.edit5:setParent(obj.layout8);
-    obj.edit5:setAlign("left");
-    obj.edit5:setWidth(120);
-    obj.edit5:setField("tamanho");
-    obj.edit5:setName("edit5");
-
     obj.layout9 = GUI.fromHandle(_obj_newObject("layout"));
     obj.layout9:setParent(obj.scrollBox2);
     obj.layout9:setAlign("top");
@@ -341,254 +333,362 @@ local function constructNew_frmMonstros()
     obj.layout9:setMargins({top=4});
     obj.layout9:setName("layout9");
 
+    obj.label6 = GUI.fromHandle(_obj_newObject("label"));
+    obj.label6:setParent(obj.layout9);
+    obj.label6:setAlign("left");
+    obj.label6:setWidth(50);
+    obj.label6:setText("Nome:");
+    obj.label6:setName("label6");
+
+    obj.edit2 = GUI.fromHandle(_obj_newObject("edit"));
+    obj.edit2:setParent(obj.layout9);
+    obj.edit2:setAlign("left");
+    obj.edit2:setWidth(300);
+    obj.edit2:setField("nome");
+    obj.edit2:setName("edit2");
+
+    obj.layout10 = GUI.fromHandle(_obj_newObject("layout"));
+    obj.layout10:setParent(obj.scrollBox2);
+    obj.layout10:setAlign("top");
+    obj.layout10:setHeight(30);
+    obj.layout10:setName("layout10");
+
+    obj.label7 = GUI.fromHandle(_obj_newObject("label"));
+    obj.label7:setParent(obj.layout10);
+    obj.label7:setAlign("left");
+    obj.label7:setWidth(50);
+    obj.label7:setText("ND:");
+    obj.label7:setName("label7");
+
+    obj.edit3 = GUI.fromHandle(_obj_newObject("edit"));
+    obj.edit3:setParent(obj.layout10);
+    obj.edit3:setAlign("left");
+    obj.edit3:setWidth(50);
+    obj.edit3:setField("nd");
+    obj.edit3:setMargins({left=4});
+    obj.edit3:setName("edit3");
+
     obj.label8 = GUI.fromHandle(_obj_newObject("label"));
-    obj.label8:setParent(obj.layout9);
+    obj.label8:setParent(obj.layout10);
     obj.label8:setAlign("left");
     obj.label8:setWidth(50);
-    obj.label8:setText("PV:");
+    obj.label8:setText("Tipo:");
+    obj.label8:setMargins({left=10});
     obj.label8:setName("label8");
 
+    obj.edit4 = GUI.fromHandle(_obj_newObject("edit"));
+    obj.edit4:setParent(obj.layout10);
+    obj.edit4:setAlign("left");
+    obj.edit4:setWidth(120);
+    obj.edit4:setField("tipo");
+    obj.edit4:setName("edit4");
+
+    obj.label9 = GUI.fromHandle(_obj_newObject("label"));
+    obj.label9:setParent(obj.layout10);
+    obj.label9:setAlign("left");
+    obj.label9:setWidth(100);
+    obj.label9:setText("Tamanho:");
+    obj.label9:setMargins({left=10});
+    obj.label9:setName("label9");
+
+    obj.edit5 = GUI.fromHandle(_obj_newObject("edit"));
+    obj.edit5:setParent(obj.layout10);
+    obj.edit5:setAlign("left");
+    obj.edit5:setWidth(120);
+    obj.edit5:setField("tamanho");
+    obj.edit5:setName("edit5");
+
+    obj.layout11 = GUI.fromHandle(_obj_newObject("layout"));
+    obj.layout11:setParent(obj.scrollBox2);
+    obj.layout11:setAlign("top");
+    obj.layout11:setHeight(30);
+    obj.layout11:setMargins({top=4});
+    obj.layout11:setName("layout11");
+
+    obj.label10 = GUI.fromHandle(_obj_newObject("label"));
+    obj.label10:setParent(obj.layout11);
+    obj.label10:setAlign("left");
+    obj.label10:setWidth(50);
+    obj.label10:setText("PV:");
+    obj.label10:setName("label10");
+
     obj.edit6 = GUI.fromHandle(_obj_newObject("edit"));
-    obj.edit6:setParent(obj.layout9);
+    obj.edit6:setParent(obj.layout11);
     obj.edit6:setAlign("left");
     obj.edit6:setWidth(60);
     obj.edit6:setField("pv");
     obj.edit6:setMargins({left=4});
     obj.edit6:setName("edit6");
 
-    obj.label9 = GUI.fromHandle(_obj_newObject("label"));
-    obj.label9:setParent(obj.layout9);
-    obj.label9:setText("Mana:");
-    obj.label9:setAlign("left");
-    obj.label9:setWidth(60);
-    obj.label9:setName("label9");
+    obj.label11 = GUI.fromHandle(_obj_newObject("label"));
+    obj.label11:setParent(obj.layout11);
+    obj.label11:setText("Mana:");
+    obj.label11:setAlign("left");
+    obj.label11:setWidth(60);
+    obj.label11:setName("label11");
 
     obj.edtMana = GUI.fromHandle(_obj_newObject("edit"));
-    obj.edtMana:setParent(obj.layout9);
+    obj.edtMana:setParent(obj.layout11);
     obj.edtMana:setName("edtMana");
     obj.edtMana:setAlign("left");
     obj.edtMana:setWidth(80);
     obj.edtMana:setField("mana");
     obj.edtMana:setVisible(true);
 
-    obj.label10 = GUI.fromHandle(_obj_newObject("label"));
-    obj.label10:setParent(obj.layout9);
-    obj.label10:setAlign("left");
-    obj.label10:setWidth(50);
-    obj.label10:setText("Defesa:");
-    obj.label10:setMargins({left=10});
-    obj.label10:setName("label10");
+    obj.label12 = GUI.fromHandle(_obj_newObject("label"));
+    obj.label12:setParent(obj.layout11);
+    obj.label12:setAlign("left");
+    obj.label12:setWidth(50);
+    obj.label12:setText("Defesa:");
+    obj.label12:setMargins({left=10});
+    obj.label12:setName("label12");
 
     obj.edit7 = GUI.fromHandle(_obj_newObject("edit"));
-    obj.edit7:setParent(obj.layout9);
+    obj.edit7:setParent(obj.layout11);
     obj.edit7:setAlign("left");
     obj.edit7:setWidth(60);
     obj.edit7:setField("ca");
     obj.edit7:setName("edit7");
 
-    obj.label11 = GUI.fromHandle(_obj_newObject("label"));
-    obj.label11:setParent(obj.layout9);
-    obj.label11:setAlign("left");
-    obj.label11:setWidth(110);
-    obj.label11:setText("Deslocamento:");
-    obj.label11:setMargins({left=10});
-    obj.label11:setName("label11");
+    obj.label13 = GUI.fromHandle(_obj_newObject("label"));
+    obj.label13:setParent(obj.layout11);
+    obj.label13:setAlign("left");
+    obj.label13:setWidth(110);
+    obj.label13:setText("Deslocamento:");
+    obj.label13:setMargins({left=10});
+    obj.label13:setName("label13");
 
     obj.edit8 = GUI.fromHandle(_obj_newObject("edit"));
-    obj.edit8:setParent(obj.layout9);
+    obj.edit8:setParent(obj.layout11);
     obj.edit8:setAlign("left");
     obj.edit8:setWidth(120);
     obj.edit8:setField("deslocamento");
     obj.edit8:setName("edit8");
 
-    obj.layout10 = GUI.fromHandle(_obj_newObject("layout"));
-    obj.layout10:setParent(obj.scrollBox2);
-    obj.layout10:setAlign("top");
-    obj.layout10:setHeight(20);
-    obj.layout10:setMargins({top=6});
-    obj.layout10:setName("layout10");
+    obj.layout12 = GUI.fromHandle(_obj_newObject("layout"));
+    obj.layout12:setParent(obj.scrollBox2);
+    obj.layout12:setAlign("top");
+    obj.layout12:setHeight(30);
+    obj.layout12:setMargins({top=4});
+    obj.layout12:setName("layout12");
 
-    obj.label12 = GUI.fromHandle(_obj_newObject("label"));
-    obj.label12:setParent(obj.layout10);
-    obj.label12:setText("Atributos:");
-    obj.label12:setAlign("left");
-    obj.label12:setWidth(200);
-    obj.label12:setName("label12");
-
-    obj.layout11 = GUI.fromHandle(_obj_newObject("layout"));
-    obj.layout11:setParent(obj.scrollBox2);
-    obj.layout11:setAlign("top");
-    obj.layout11:setHeight(30);
-    obj.layout11:setName("layout11");
-
-    obj.button6 = GUI.fromHandle(_obj_newObject("button"));
-    obj.button6:setParent(obj.layout11);
-    obj.button6:setText("FOR");
-    obj.button6:setAlign("left");
-    obj.button6:setWidth(50);
-    obj.button6:setName("button6");
+    obj.label14 = GUI.fromHandle(_obj_newObject("label"));
+    obj.label14:setParent(obj.layout12);
+    obj.label14:setAlign("left");
+    obj.label14:setWidth(90);
+    obj.label14:setText("Iniciativa:");
+    obj.label14:setName("label14");
 
     obj.edit9 = GUI.fromHandle(_obj_newObject("edit"));
-    obj.edit9:setParent(obj.layout11);
-    obj.edit9:setField("att_for");
+    obj.edit9:setParent(obj.layout12);
     obj.edit9:setAlign("left");
-    obj.edit9:setWidth(40);
-    obj.edit9:setMargins({left=2, right=8});
+    obj.edit9:setWidth(70);
+    obj.edit9:setField("iniciativa");
     obj.edit9:setName("edit9");
 
-    obj.button7 = GUI.fromHandle(_obj_newObject("button"));
-    obj.button7:setParent(obj.layout11);
-    obj.button7:setText("DES");
-    obj.button7:setAlign("left");
-    obj.button7:setWidth(50);
-    obj.button7:setName("button7");
+    obj.label15 = GUI.fromHandle(_obj_newObject("label"));
+    obj.label15:setParent(obj.layout12);
+    obj.label15:setAlign("left");
+    obj.label15:setWidth(90);
+    obj.label15:setText("Percepcao:");
+    obj.label15:setMargins({left=12});
+    obj.label15:setName("label15");
 
     obj.edit10 = GUI.fromHandle(_obj_newObject("edit"));
-    obj.edit10:setParent(obj.layout11);
-    obj.edit10:setField("att_des");
+    obj.edit10:setParent(obj.layout12);
     obj.edit10:setAlign("left");
-    obj.edit10:setWidth(40);
-    obj.edit10:setMargins({left=2, right=8});
+    obj.edit10:setWidth(70);
+    obj.edit10:setField("percepcao");
     obj.edit10:setName("edit10");
 
+    obj.layout13 = GUI.fromHandle(_obj_newObject("layout"));
+    obj.layout13:setParent(obj.scrollBox2);
+    obj.layout13:setAlign("top");
+    obj.layout13:setHeight(20);
+    obj.layout13:setMargins({top=6});
+    obj.layout13:setName("layout13");
+
+    obj.label16 = GUI.fromHandle(_obj_newObject("label"));
+    obj.label16:setParent(obj.layout13);
+    obj.label16:setText("Atributos:");
+    obj.label16:setAlign("left");
+    obj.label16:setWidth(200);
+    obj.label16:setName("label16");
+
+    obj.layout14 = GUI.fromHandle(_obj_newObject("layout"));
+    obj.layout14:setParent(obj.scrollBox2);
+    obj.layout14:setAlign("top");
+    obj.layout14:setHeight(30);
+    obj.layout14:setName("layout14");
+
     obj.button8 = GUI.fromHandle(_obj_newObject("button"));
-    obj.button8:setParent(obj.layout11);
-    obj.button8:setText("CON");
+    obj.button8:setParent(obj.layout14);
+    obj.button8:setText("FOR");
     obj.button8:setAlign("left");
     obj.button8:setWidth(50);
     obj.button8:setName("button8");
 
     obj.edit11 = GUI.fromHandle(_obj_newObject("edit"));
-    obj.edit11:setParent(obj.layout11);
-    obj.edit11:setField("att_con");
+    obj.edit11:setParent(obj.layout14);
+    obj.edit11:setField("att_for");
     obj.edit11:setAlign("left");
     obj.edit11:setWidth(40);
     obj.edit11:setMargins({left=2, right=8});
     obj.edit11:setName("edit11");
 
     obj.button9 = GUI.fromHandle(_obj_newObject("button"));
-    obj.button9:setParent(obj.layout11);
-    obj.button9:setText("INT");
+    obj.button9:setParent(obj.layout14);
+    obj.button9:setText("DES");
     obj.button9:setAlign("left");
     obj.button9:setWidth(50);
     obj.button9:setName("button9");
 
     obj.edit12 = GUI.fromHandle(_obj_newObject("edit"));
-    obj.edit12:setParent(obj.layout11);
-    obj.edit12:setField("att_int");
+    obj.edit12:setParent(obj.layout14);
+    obj.edit12:setField("att_des");
     obj.edit12:setAlign("left");
     obj.edit12:setWidth(40);
     obj.edit12:setMargins({left=2, right=8});
     obj.edit12:setName("edit12");
 
     obj.button10 = GUI.fromHandle(_obj_newObject("button"));
-    obj.button10:setParent(obj.layout11);
-    obj.button10:setText("SAB");
+    obj.button10:setParent(obj.layout14);
+    obj.button10:setText("CON");
     obj.button10:setAlign("left");
     obj.button10:setWidth(50);
     obj.button10:setName("button10");
 
     obj.edit13 = GUI.fromHandle(_obj_newObject("edit"));
-    obj.edit13:setParent(obj.layout11);
-    obj.edit13:setField("att_sab");
+    obj.edit13:setParent(obj.layout14);
+    obj.edit13:setField("att_con");
     obj.edit13:setAlign("left");
     obj.edit13:setWidth(40);
     obj.edit13:setMargins({left=2, right=8});
     obj.edit13:setName("edit13");
 
     obj.button11 = GUI.fromHandle(_obj_newObject("button"));
-    obj.button11:setParent(obj.layout11);
-    obj.button11:setText("CAR");
+    obj.button11:setParent(obj.layout14);
+    obj.button11:setText("INT");
     obj.button11:setAlign("left");
     obj.button11:setWidth(50);
     obj.button11:setName("button11");
 
     obj.edit14 = GUI.fromHandle(_obj_newObject("edit"));
-    obj.edit14:setParent(obj.layout11);
-    obj.edit14:setField("att_car");
+    obj.edit14:setParent(obj.layout14);
+    obj.edit14:setField("att_int");
     obj.edit14:setAlign("left");
     obj.edit14:setWidth(40);
-    obj.edit14:setMargins({left=2});
+    obj.edit14:setMargins({left=2, right=8});
     obj.edit14:setName("edit14");
 
-    obj.layout12 = GUI.fromHandle(_obj_newObject("layout"));
-    obj.layout12:setParent(obj.scrollBox2);
-    obj.layout12:setAlign("top");
-    obj.layout12:setHeight(20);
-    obj.layout12:setMargins({top=8});
-    obj.layout12:setName("layout12");
-
-    obj.label13 = GUI.fromHandle(_obj_newObject("label"));
-    obj.label13:setParent(obj.layout12);
-    obj.label13:setText("Resistencias:");
-    obj.label13:setAlign("left");
-    obj.label13:setWidth(200);
-    obj.label13:setName("label13");
-
-    obj.layout13 = GUI.fromHandle(_obj_newObject("layout"));
-    obj.layout13:setParent(obj.scrollBox2);
-    obj.layout13:setAlign("top");
-    obj.layout13:setHeight(30);
-    obj.layout13:setName("layout13");
-
     obj.button12 = GUI.fromHandle(_obj_newObject("button"));
-    obj.button12:setParent(obj.layout13);
-    obj.button12:setText("Fort");
+    obj.button12:setParent(obj.layout14);
+    obj.button12:setText("SAB");
     obj.button12:setAlign("left");
-    obj.button12:setWidth(40);
+    obj.button12:setWidth(50);
     obj.button12:setName("button12");
 
     obj.edit15 = GUI.fromHandle(_obj_newObject("edit"));
-    obj.edit15:setParent(obj.layout13);
-    obj.edit15:setField("res_fort");
+    obj.edit15:setParent(obj.layout14);
+    obj.edit15:setField("att_sab");
     obj.edit15:setAlign("left");
-    obj.edit15:setWidth(50);
-    obj.edit15:setMargins({left=2, right=15});
+    obj.edit15:setWidth(40);
+    obj.edit15:setMargins({left=2, right=8});
     obj.edit15:setName("edit15");
 
     obj.button13 = GUI.fromHandle(_obj_newObject("button"));
-    obj.button13:setParent(obj.layout13);
-    obj.button13:setText("Ref");
+    obj.button13:setParent(obj.layout14);
+    obj.button13:setText("CAR");
     obj.button13:setAlign("left");
-    obj.button13:setWidth(40);
+    obj.button13:setWidth(50);
     obj.button13:setName("button13");
 
     obj.edit16 = GUI.fromHandle(_obj_newObject("edit"));
-    obj.edit16:setParent(obj.layout13);
-    obj.edit16:setField("res_ref");
+    obj.edit16:setParent(obj.layout14);
+    obj.edit16:setField("att_car");
     obj.edit16:setAlign("left");
-    obj.edit16:setWidth(50);
-    obj.edit16:setMargins({left=2, right=15});
+    obj.edit16:setWidth(40);
+    obj.edit16:setMargins({left=2});
     obj.edit16:setName("edit16");
 
+    obj.layout15 = GUI.fromHandle(_obj_newObject("layout"));
+    obj.layout15:setParent(obj.scrollBox2);
+    obj.layout15:setAlign("top");
+    obj.layout15:setHeight(20);
+    obj.layout15:setMargins({top=8});
+    obj.layout15:setName("layout15");
+
+    obj.label17 = GUI.fromHandle(_obj_newObject("label"));
+    obj.label17:setParent(obj.layout15);
+    obj.label17:setText("Resistencias:");
+    obj.label17:setAlign("left");
+    obj.label17:setWidth(200);
+    obj.label17:setName("label17");
+
+    obj.layout16 = GUI.fromHandle(_obj_newObject("layout"));
+    obj.layout16:setParent(obj.scrollBox2);
+    obj.layout16:setAlign("top");
+    obj.layout16:setHeight(30);
+    obj.layout16:setName("layout16");
+
     obj.button14 = GUI.fromHandle(_obj_newObject("button"));
-    obj.button14:setParent(obj.layout13);
-    obj.button14:setText("Von");
+    obj.button14:setParent(obj.layout16);
+    obj.button14:setText("Fort");
     obj.button14:setAlign("left");
     obj.button14:setWidth(40);
     obj.button14:setName("button14");
 
     obj.edit17 = GUI.fromHandle(_obj_newObject("edit"));
-    obj.edit17:setParent(obj.layout13);
-    obj.edit17:setField("res_von");
+    obj.edit17:setParent(obj.layout16);
+    obj.edit17:setField("res_fort");
     obj.edit17:setAlign("left");
     obj.edit17:setWidth(50);
-    obj.edit17:setMargins({left=2});
+    obj.edit17:setMargins({left=2, right=15});
     obj.edit17:setName("edit17");
 
-    obj.layout14 = GUI.fromHandle(_obj_newObject("layout"));
-    obj.layout14:setParent(obj.scrollBox2);
-    obj.layout14:setAlign("top");
-    obj.layout14:setHeight(20);
-    obj.layout14:setMargins({top=8});
-    obj.layout14:setName("layout14");
+    obj.button15 = GUI.fromHandle(_obj_newObject("button"));
+    obj.button15:setParent(obj.layout16);
+    obj.button15:setText("Ref");
+    obj.button15:setAlign("left");
+    obj.button15:setWidth(40);
+    obj.button15:setName("button15");
 
-    obj.label14 = GUI.fromHandle(_obj_newObject("label"));
-    obj.label14:setParent(obj.layout14);
-    obj.label14:setText("Acoes / Rolagens:");
-    obj.label14:setAlign("left");
-    obj.label14:setWidth(200);
-    obj.label14:setName("label14");
+    obj.edit18 = GUI.fromHandle(_obj_newObject("edit"));
+    obj.edit18:setParent(obj.layout16);
+    obj.edit18:setField("res_ref");
+    obj.edit18:setAlign("left");
+    obj.edit18:setWidth(50);
+    obj.edit18:setMargins({left=2, right=15});
+    obj.edit18:setName("edit18");
+
+    obj.button16 = GUI.fromHandle(_obj_newObject("button"));
+    obj.button16:setParent(obj.layout16);
+    obj.button16:setText("Von");
+    obj.button16:setAlign("left");
+    obj.button16:setWidth(40);
+    obj.button16:setName("button16");
+
+    obj.edit19 = GUI.fromHandle(_obj_newObject("edit"));
+    obj.edit19:setParent(obj.layout16);
+    obj.edit19:setField("res_von");
+    obj.edit19:setAlign("left");
+    obj.edit19:setWidth(50);
+    obj.edit19:setMargins({left=2});
+    obj.edit19:setName("edit19");
+
+    obj.layout17 = GUI.fromHandle(_obj_newObject("layout"));
+    obj.layout17:setParent(obj.scrollBox2);
+    obj.layout17:setAlign("top");
+    obj.layout17:setHeight(20);
+    obj.layout17:setMargins({top=8});
+    obj.layout17:setName("layout17");
+
+    obj.label18 = GUI.fromHandle(_obj_newObject("label"));
+    obj.label18:setParent(obj.layout17);
+    obj.label18:setText("Acoes / Rolagens:");
+    obj.label18:setAlign("left");
+    obj.label18:setWidth(200);
+    obj.label18:setName("label18");
 
     obj.flwDin = GUI.fromHandle(_obj_newObject("flowLayout"));
     obj.flwDin:setParent(obj.scrollBox2);
@@ -598,60 +698,109 @@ local function constructNew_frmMonstros()
     obj.flwDin:setAutoHeight(true);
     obj.flwDin:setMinWidth(150);
 
-    obj.layout15 = GUI.fromHandle(_obj_newObject("layout"));
-    obj.layout15:setParent(obj.scrollBox2);
-    obj.layout15:setAlign("top");
-    obj.layout15:setHeight(20);
-    obj.layout15:setMargins({top=8});
-    obj.layout15:setName("layout15");
+    obj.layout18 = GUI.fromHandle(_obj_newObject("layout"));
+    obj.layout18:setParent(obj.scrollBox2);
+    obj.layout18:setAlign("top");
+    obj.layout18:setHeight(20);
+    obj.layout18:setMargins({top=8});
+    obj.layout18:setName("layout18");
 
-    obj.label15 = GUI.fromHandle(_obj_newObject("label"));
-    obj.label15:setParent(obj.layout15);
-    obj.label15:setText("Equipamentos:");
-    obj.label15:setAlign("left");
-    obj.label15:setWidth(200);
-    obj.label15:setName("label15");
+    obj.label19 = GUI.fromHandle(_obj_newObject("label"));
+    obj.label19:setParent(obj.layout18);
+    obj.label19:setText("Equipamentos:");
+    obj.label19:setAlign("left");
+    obj.label19:setWidth(200);
+    obj.label19:setName("label19");
 
-    obj.layout16 = GUI.fromHandle(_obj_newObject("layout"));
-    obj.layout16:setParent(obj.scrollBox2);
-    obj.layout16:setAlign("top");
-    obj.layout16:setHeight(90);
-    obj.layout16:setName("layout16");
+    obj.layout19 = GUI.fromHandle(_obj_newObject("layout"));
+    obj.layout19:setParent(obj.scrollBox2);
+    obj.layout19:setAlign("top");
+    obj.layout19:setHeight(90);
+    obj.layout19:setName("layout19");
 
     obj.edtEquip = GUI.fromHandle(_obj_newObject("textEditor"));
-    obj.edtEquip:setParent(obj.layout16);
+    obj.edtEquip:setParent(obj.layout19);
     obj.edtEquip:setName("edtEquip");
     obj.edtEquip:setField("equipamentos");
     obj.edtEquip:setAlign("left");
     obj.edtEquip:setWidth(900);
     obj.edtEquip:setHeight(80);
 
-    obj.layout17 = GUI.fromHandle(_obj_newObject("layout"));
-    obj.layout17:setParent(obj.scrollBox2);
-    obj.layout17:setAlign("top");
-    obj.layout17:setHeight(30);
-    obj.layout17:setMargins({top=6});
-    obj.layout17:setName("layout17");
+    obj.layout20 = GUI.fromHandle(_obj_newObject("layout"));
+    obj.layout20:setParent(obj.scrollBox2);
+    obj.layout20:setAlign("top");
+    obj.layout20:setHeight(110);
+    obj.layout20:setMargins({top=8});
+    obj.layout20:setName("layout20");
 
-    obj.button15 = GUI.fromHandle(_obj_newObject("button"));
-    obj.button15:setParent(obj.layout17);
-    obj.button15:setText("Excluir");
-    obj.button15:setAlign("left");
-    obj.button15:setWidth(120);
-    obj.button15:setFontColor("#FF4444");
-    obj.button15:setName("button15");
+    obj.label20 = GUI.fromHandle(_obj_newObject("label"));
+    obj.label20:setParent(obj.layout20);
+    obj.label20:setText("Dados adicionais / campos sem equivalente:");
+    obj.label20:setAlign("top");
+    obj.label20:setHeight(20);
+    obj.label20:setName("label20");
 
-    obj._e_event0 = obj.button1:addEventListener("onClick",
+    obj.textEditor1 = GUI.fromHandle(_obj_newObject("textEditor"));
+    obj.textEditor1:setParent(obj.layout20);
+    obj.textEditor1:setField("dadosAdicionais");
+    obj.textEditor1:setAlign("client");
+    obj.textEditor1:setHeight(80);
+    obj.textEditor1:setReadOnly(true);
+    obj.textEditor1:setName("textEditor1");
+
+    obj.layout21 = GUI.fromHandle(_obj_newObject("layout"));
+    obj.layout21:setParent(obj.scrollBox2);
+    obj.layout21:setAlign("top");
+    obj.layout21:setHeight(110);
+    obj.layout21:setMargins({top=8});
+    obj.layout21:setName("layout21");
+
+    obj.label21 = GUI.fromHandle(_obj_newObject("label"));
+    obj.label21:setParent(obj.layout21);
+    obj.label21:setText("originalSheet:");
+    obj.label21:setAlign("top");
+    obj.label21:setHeight(20);
+    obj.label21:setName("label21");
+
+    obj.textEditor2 = GUI.fromHandle(_obj_newObject("textEditor"));
+    obj.textEditor2:setParent(obj.layout21);
+    obj.textEditor2:setField("originalSheet");
+    obj.textEditor2:setAlign("client");
+    obj.textEditor2:setHeight(80);
+    obj.textEditor2:setReadOnly(true);
+    obj.textEditor2:setName("textEditor2");
+
+    obj.layout22 = GUI.fromHandle(_obj_newObject("layout"));
+    obj.layout22:setParent(obj.scrollBox2);
+    obj.layout22:setAlign("top");
+    obj.layout22:setHeight(30);
+    obj.layout22:setMargins({top=6});
+    obj.layout22:setName("layout22");
+
+    obj.button17 = GUI.fromHandle(_obj_newObject("button"));
+    obj.button17:setParent(obj.layout22);
+    obj.button17:setText("Excluir");
+    obj.button17:setAlign("left");
+    obj.button17:setWidth(120);
+    obj.button17:setFontColor("#FF4444");
+    obj.button17:setName("button17");
+
+    obj._e_event0 = obj:addEventListener("onNodeReady",
+        function ()
+            onNodeReady(self)
+        end);
+
+    obj._e_event1 = obj.button1:addEventListener("onClick",
         function (event)
             self.rclMonstros:append();
         end);
 
-    obj._e_event1 = obj.button2:addEventListener("onClick",
+    obj._e_event2 = obj.button2:addEventListener("onClick",
         function (event)
             showMessage("Botao de teste sem funcao definida.");
         end);
 
-    obj._e_event2 = obj.rclMonstros:addEventListener("onSelect",
+    obj._e_event3 = obj.rclMonstros:addEventListener("onSelect",
         function ()
             local node = self.rclMonstros.selectedNode
                         self.box.node = node
@@ -662,70 +811,81 @@ local function constructNew_frmMonstros()
             
                         if node ~= nil then
                             atualizarMana(self)
+                            iniciarRecepcaoSaoNode(self)
                         end
         end);
 
-    obj._e_event3 = obj.button3:addEventListener("onClick",
+    obj._e_event4 = obj.button3:addEventListener("onClick",
         function (event)
             askAndCallIA(self, self.box.node)
         end);
 
-    obj._e_event4 = obj.button4:addEventListener("onClick",
+    obj._e_event5 = obj.button4:addEventListener("onClick",
         function (event)
             aplicarFichaNoTokenSelecionado(self.box.node)
         end);
 
-    obj._e_event5 = obj.button5:addEventListener("onClick",
+    obj._e_event6 = obj.button5:addEventListener("onClick",
         function (event)
             salvarFichaLocalmente(self.box.node)
         end);
 
-    obj._e_event6 = obj.button6:addEventListener("onClick",
+    obj._e_event7 = obj.button6:addEventListener("onClick",
+        function (event)
+            askSaoNodeAndFill(self, self.box.node)
+        end);
+
+    obj._e_event8 = obj.button7:addEventListener("onClick",
+        function (event)
+            receberDoSaoNode(self)
+        end);
+
+    obj._e_event9 = obj.button8:addEventListener("onClick",
         function (event)
             rolarSimples(self, "att_for", "FOR")
         end);
 
-    obj._e_event7 = obj.button7:addEventListener("onClick",
+    obj._e_event10 = obj.button9:addEventListener("onClick",
         function (event)
             rolarSimples(self, "att_des", "DES")
         end);
 
-    obj._e_event8 = obj.button8:addEventListener("onClick",
+    obj._e_event11 = obj.button10:addEventListener("onClick",
         function (event)
             rolarSimples(self, "att_con", "CON")
         end);
 
-    obj._e_event9 = obj.button9:addEventListener("onClick",
+    obj._e_event12 = obj.button11:addEventListener("onClick",
         function (event)
             rolarSimples(self, "att_int", "INT")
         end);
 
-    obj._e_event10 = obj.button10:addEventListener("onClick",
+    obj._e_event13 = obj.button12:addEventListener("onClick",
         function (event)
             rolarSimples(self, "att_sab", "SAB")
         end);
 
-    obj._e_event11 = obj.button11:addEventListener("onClick",
+    obj._e_event14 = obj.button13:addEventListener("onClick",
         function (event)
             rolarSimples(self, "att_car", "CAR")
         end);
 
-    obj._e_event12 = obj.button12:addEventListener("onClick",
+    obj._e_event15 = obj.button14:addEventListener("onClick",
         function (event)
             rolarSimples(self, "res_fort", "Fortitude")
         end);
 
-    obj._e_event13 = obj.button13:addEventListener("onClick",
+    obj._e_event16 = obj.button15:addEventListener("onClick",
         function (event)
             rolarSimples(self, "res_ref", "Reflexos")
         end);
 
-    obj._e_event14 = obj.button14:addEventListener("onClick",
+    obj._e_event17 = obj.button16:addEventListener("onClick",
         function (event)
             rolarSimples(self, "res_von", "Vontade")
         end);
 
-    obj._e_event15 = obj.button15:addEventListener("onClick",
+    obj._e_event18 = obj.button17:addEventListener("onClick",
         function (event)
             if self.box.node then
                                                 local apagar = self.box.node
@@ -736,6 +896,9 @@ local function constructNew_frmMonstros()
         end);
 
     function obj:_releaseEvents()
+        __o_rrpgObjs.removeEventListenerById(self._e_event18);
+        __o_rrpgObjs.removeEventListenerById(self._e_event17);
+        __o_rrpgObjs.removeEventListenerById(self._e_event16);
         __o_rrpgObjs.removeEventListenerById(self._e_event15);
         __o_rrpgObjs.removeEventListenerById(self._e_event14);
         __o_rrpgObjs.removeEventListenerById(self._e_event13);
@@ -764,12 +927,16 @@ local function constructNew_frmMonstros()
         end;
 
         if self.layout8 ~= nil then self.layout8:destroy(); self.layout8 = nil; end;
+        if self.label16 ~= nil then self.label16:destroy(); self.label16 = nil; end;
+        if self.edit16 ~= nil then self.edit16:destroy(); self.edit16 = nil; end;
+        if self.button16 ~= nil then self.button16:destroy(); self.button16 = nil; end;
         if self.edit4 ~= nil then self.edit4:destroy(); self.edit4 = nil; end;
         if self.layout11 ~= nil then self.layout11:destroy(); self.layout11 = nil; end;
         if self.edit10 ~= nil then self.edit10:destroy(); self.edit10 = nil; end;
         if self.edtTextoIA ~= nil then self.edtTextoIA:destroy(); self.edtTextoIA = nil; end;
         if self.flwDin ~= nil then self.flwDin:destroy(); self.flwDin = nil; end;
         if self.layout3 ~= nil then self.layout3:destroy(); self.layout3 = nil; end;
+        if self.textEditor2 ~= nil then self.textEditor2:destroy(); self.textEditor2 = nil; end;
         if self.layout17 ~= nil then self.layout17:destroy(); self.layout17 = nil; end;
         if self.label11 ~= nil then self.label11:destroy(); self.label11 = nil; end;
         if self.button11 ~= nil then self.button11:destroy(); self.button11 = nil; end;
@@ -778,6 +945,7 @@ local function constructNew_frmMonstros()
         if self.edit8 ~= nil then self.edit8:destroy(); self.edit8 = nil; end;
         if self.edit5 ~= nil then self.edit5:destroy(); self.edit5 = nil; end;
         if self.layout10 ~= nil then self.layout10:destroy(); self.layout10 = nil; end;
+        if self.layout22 ~= nil then self.layout22:destroy(); self.layout22 = nil; end;
         if self.layout4 ~= nil then self.layout4:destroy(); self.layout4 = nil; end;
         if self.box ~= nil then self.box:destroy(); self.box = nil; end;
         if self.layout16 ~= nil then self.layout16:destroy(); self.layout16 = nil; end;
@@ -789,29 +957,37 @@ local function constructNew_frmMonstros()
         if self.button10 ~= nil then self.button10:destroy(); self.button10 = nil; end;
         if self.edit9 ~= nil then self.edit9:destroy(); self.edit9 = nil; end;
         if self.edit14 ~= nil then self.edit14:destroy(); self.edit14 = nil; end;
+        if self.edit19 ~= nil then self.edit19:destroy(); self.edit19 = nil; end;
         if self.edit2 ~= nil then self.edit2:destroy(); self.edit2 = nil; end;
         if self.layout13 ~= nil then self.layout13:destroy(); self.layout13 = nil; end;
         if self.button4 ~= nil then self.button4:destroy(); self.button4 = nil; end;
         if self.label4 ~= nil then self.label4:destroy(); self.label4 = nil; end;
         if self.label15 ~= nil then self.label15:destroy(); self.label15 = nil; end;
         if self.layout5 ~= nil then self.layout5:destroy(); self.layout5 = nil; end;
-        if self.edtEquip ~= nil then self.edtEquip:destroy(); self.edtEquip = nil; end;
         if self.button15 ~= nil then self.button15:destroy(); self.button15 = nil; end;
+        if self.edtEquip ~= nil then self.edtEquip:destroy(); self.edtEquip = nil; end;
+        if self.edtSaoNodeCampaignId ~= nil then self.edtSaoNodeCampaignId:destroy(); self.edtSaoNodeCampaignId = nil; end;
+        if self.layout19 ~= nil then self.layout19:destroy(); self.layout19 = nil; end;
+        if self.edit18 ~= nil then self.edit18:destroy(); self.edit18 = nil; end;
         if self.button2 ~= nil then self.button2:destroy(); self.button2 = nil; end;
         if self.label2 ~= nil then self.label2:destroy(); self.label2 = nil; end;
-        if self.edit13 ~= nil then self.edit13:destroy(); self.edit13 = nil; end;
         if self.label13 ~= nil then self.label13:destroy(); self.label13 = nil; end;
+        if self.edit13 ~= nil then self.edit13:destroy(); self.edit13 = nil; end;
         if self.rectangle1 ~= nil then self.rectangle1:destroy(); self.rectangle1 = nil; end;
         if self.button13 ~= nil then self.button13:destroy(); self.button13 = nil; end;
         if self.edit3 ~= nil then self.edit3:destroy(); self.edit3 = nil; end;
         if self.label8 ~= nil then self.label8:destroy(); self.label8 = nil; end;
-        if self.button8 ~= nil then self.button8:destroy(); self.button8 = nil; end;
         if self.layout12 ~= nil then self.layout12:destroy(); self.layout12 = nil; end;
+        if self.button8 ~= nil then self.button8:destroy(); self.button8 = nil; end;
         if self.button5 ~= nil then self.button5:destroy(); self.button5 = nil; end;
         if self.label5 ~= nil then self.label5:destroy(); self.label5 = nil; end;
-        if self.button14 ~= nil then self.button14:destroy(); self.button14 = nil; end;
-        if self.layout6 ~= nil then self.layout6:destroy(); self.layout6 = nil; end;
         if self.label14 ~= nil then self.label14:destroy(); self.label14 = nil; end;
+        if self.layout6 ~= nil then self.layout6:destroy(); self.layout6 = nil; end;
+        if self.button14 ~= nil then self.button14:destroy(); self.button14 = nil; end;
+        if self.label19 ~= nil then self.label19:destroy(); self.label19 = nil; end;
+        if self.layout20 ~= nil then self.layout20:destroy(); self.layout20 = nil; end;
+        if self.textEditor1 ~= nil then self.textEditor1:destroy(); self.textEditor1 = nil; end;
+        if self.layout18 ~= nil then self.layout18:destroy(); self.layout18 = nil; end;
         if self.edtComoJogar ~= nil then self.edtComoJogar:destroy(); self.edtComoJogar = nil; end;
         if self.button3 ~= nil then self.button3:destroy(); self.button3 = nil; end;
         if self.label3 ~= nil then self.label3:destroy(); self.label3 = nil; end;
@@ -821,23 +997,29 @@ local function constructNew_frmMonstros()
         if self.edit12 ~= nil then self.edit12:destroy(); self.edit12 = nil; end;
         if self.layout1 ~= nil then self.layout1:destroy(); self.layout1 = nil; end;
         if self.button12 ~= nil then self.button12:destroy(); self.button12 = nil; end;
+        if self.label20 ~= nil then self.label20:destroy(); self.label20 = nil; end;
         if self.label9 ~= nil then self.label9:destroy(); self.label9 = nil; end;
         if self.button9 ~= nil then self.button9:destroy(); self.button9 = nil; end;
         if self.layout15 ~= nil then self.layout15:destroy(); self.layout15 = nil; end;
-        if self.label6 ~= nil then self.label6:destroy(); self.label6 = nil; end;
         if self.button6 ~= nil then self.button6:destroy(); self.button6 = nil; end;
+        if self.label6 ~= nil then self.label6:destroy(); self.label6 = nil; end;
         if self.scrollBox2 ~= nil then self.scrollBox2:destroy(); self.scrollBox2 = nil; end;
         if self.layout7 ~= nil then self.layout7:destroy(); self.layout7 = nil; end;
+        if self.label17 ~= nil then self.label17:destroy(); self.label17 = nil; end;
         if self.edit17 ~= nil then self.edit17:destroy(); self.edit17 = nil; end;
+        if self.label18 ~= nil then self.label18:destroy(); self.label18 = nil; end;
+        if self.layout21 ~= nil then self.layout21:destroy(); self.layout21 = nil; end;
+        if self.button17 ~= nil then self.button17:destroy(); self.button17 = nil; end;
         if self.edit7 ~= nil then self.edit7:destroy(); self.edit7 = nil; end;
+        if self.label21 ~= nil then self.label21:destroy(); self.label21 = nil; end;
         if self.edit11 ~= nil then self.edit11:destroy(); self.edit11 = nil; end;
         if self.edtMana ~= nil then self.edtMana:destroy(); self.edtMana = nil; end;
         if self.layout2 ~= nil then self.layout2:destroy(); self.layout2 = nil; end;
         if self.edit1 ~= nil then self.edit1:destroy(); self.edit1 = nil; end;
         if self.layout14 ~= nil then self.layout14:destroy(); self.layout14 = nil; end;
         if self.label7 ~= nil then self.label7:destroy(); self.label7 = nil; end;
+        if self.edtSaoNodeMonsterId ~= nil then self.edtSaoNodeMonsterId:destroy(); self.edtSaoNodeMonsterId = nil; end;
         if self.button7 ~= nil then self.button7:destroy(); self.button7 = nil; end;
-        if self.edit16 ~= nil then self.edit16:destroy(); self.edit16 = nil; end;
         self:_oldLFMDestroy();
     end;
 

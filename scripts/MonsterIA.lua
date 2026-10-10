@@ -11,11 +11,11 @@ local Firecast = require("firecast")
 local rrpg     = require("rrpg")
 local SceneLib = require("scene")
 
-GEMINI_PROXY_URL = GEMINI_PROXY_URL or "http://localhost:3000/gemini"
-SAO_NODE_PROXY_URL = SAO_NODE_PROXY_URL or "http://localhost:3000/sao-node/monster-xml"
+GEMINI_PROXY_URL = GEMINI_PROXY_URL or "http://localhost:7000/gemini"
+SAO_NODE_PROXY_URL = SAO_NODE_PROXY_URL or "http://localhost:7000/sao-node/monster-xml"
 -- A ponte de transferências é autenticada somente no lado do Firecast.  O token
 -- nunca é persistido em nodes nem enviado ao navegador SAO-NODE.
-SAO_NODE_BRIDGE_URL = SAO_NODE_BRIDGE_URL or "http://localhost:3000"
+SAO_NODE_BRIDGE_URL = SAO_NODE_BRIDGE_URL or "http://localhost:7000"
 SAO_NODE_BRIDGE_TOKEN = SAO_NODE_BRIDGE_TOKEN or ""
 local saoNodeConsumerId = nil
 local saoNodeBridgePolling = false
@@ -1650,7 +1650,7 @@ function salvarFichaLocalmente(nodo)
     local body = json.encode({ ficha = buildFichaSavePayload(nodo) })
 
     httpPOST(
-        "http://localhost:3000/save-ficha",
+        "http://localhost:7000/save-ficha",
         body,
         function(responseText)
             local ok, payload = pcall(function() return json.decode(responseText) end)

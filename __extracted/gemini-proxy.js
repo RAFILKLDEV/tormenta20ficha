@@ -254,6 +254,6 @@ app.post("/save-ficha", async (req, res) => {
 
 app.listen(3000, () => {
     console.log("====================================");
-    console.log("🚀 Gemini Proxy rodando na porta 3000");
+    console.log("🚀 Gemini Proxy rodando na porta 7000");
     console.log("====================================");
 });
