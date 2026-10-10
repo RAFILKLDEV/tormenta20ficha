@@ -5,6 +5,9 @@
   "bin": "gemini-proxy.js",
   "main": "gemini-proxy.js",
   "type": "commonjs",
+  "scripts": {
+    "test": "node --test"
+  },
   "license": "ISC",
   "dependencies": {
     "express": "^5.1.0",

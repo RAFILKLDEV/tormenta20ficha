@@ -3,18 +3,190 @@
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 
 const app = express();
 app.use(express.json({ limit: "10mb" }));
 
-// SUA API KEY
-const API_KEY = "AIzaSyCzyz54cirV1USc0oCEmDKv9AruoA76k1c";
+// Credenciais são sempre fornecidas pelo ambiente do processo; nunca pelo navegador.
+const API_KEY = process.env.GEMINI_API_KEY || "";
 
 // Config de integração com o SAO-NODE (busca de monstros já cadastrados).
 // SAO_NODE_SESSION_COOKIE deve ser o valor do cookie de sessão (sao_session=...)
 // de um usuário com papel de mestre na campanha usada.
 const SAO_NODE_BASE_URL = process.env.SAO_NODE_BASE_URL || "http://localhost:3001";
 const SAO_NODE_SESSION_COOKIE = process.env.SAO_NODE_SESSION_COOKIE || "";
+const SAO_NODE_BRIDGE_TOKEN = process.env.SAO_NODE_BRIDGE_TOKEN || "";
+const FIRECAST_BRIDGE_TOKEN = process.env.FIRECAST_BRIDGE_TOKEN || SAO_NODE_BRIDGE_TOKEN;
+const PROXY_ALLOWED_ORIGINS = new Set(
+    (process.env.PROXY_ALLOWED_ORIGINS || "http://localhost:5173,http://127.0.0.1:5173")
+        .split(",").map((origin) => origin.trim()).filter(Boolean)
+);
+
+// A transferência não contém credenciais nem é aceita duas vezes. O XML fica
+// somente no processo do proxy até o plugin confirmar aplicação ou expirar.
+const transfers = new Map();
+const TRANSFER_TTL_MS = Number(process.env.FIRECAST_TRANSFER_TTL_MS || 10 * 60 * 1000);
+const MAX_TRANSFER_QUEUE = 100;
+
+function randomToken(bytes = 32) { return crypto.randomBytes(bytes).toString("base64url"); }
+function bearer(req) {
+    const value = String(req.headers.authorization || "");
+    return value.startsWith("Bearer ") ? value.slice(7) : "";
+}
+function originAllowed(req) {
+    const origin = req.headers.origin;
+    // Native Firecast requests do not send Origin; browser requests must.
+    return !origin || PROXY_ALLOWED_ORIGINS.has(origin);
+}
+function requireFirecast(req, res) {
+    if (!FIRECAST_BRIDGE_TOKEN) {
+        res.status(503).json({ error: "firecast_bridge_nao_configurado" });
+        return false;
+    }
+    const supplied = Buffer.from(bearer(req));
+    const expected = Buffer.from(FIRECAST_BRIDGE_TOKEN);
+    if (supplied.length !== expected.length || !crypto.timingSafeEqual(supplied, expected)) {
+        res.status(401).json({ error: "firecast_nao_autorizado" });
+        return false;
+    }
+    return true;
+}
+function cleanupTransfers() {
+    const now = Date.now();
+    for (const [id, transfer] of transfers) {
+        if (now - transfer.createdAt > TRANSFER_TTL_MS || ["applied", "rejected", "failed"].includes(transfer.status) && now - transfer.updatedAt > TRANSFER_TTL_MS) transfers.delete(id);
+    }
+}
+function setCors(req, res) {
+    const origin = req.headers.origin;
+    if (origin && PROXY_ALLOWED_ORIGINS.has(origin)) {
+        res.set("Access-Control-Allow-Origin", origin);
+        res.set("Vary", "Origin");
+        res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    }
+}
+app.use((req, res, next) => { setCors(req, res); if (req.method === "OPTIONS") return res.sendStatus(204); next(); });
+
+async function saoNodeRequest(pathname, options = {}) {
+    if (!SAO_NODE_BRIDGE_TOKEN) {
+        const error = new Error("SAO_NODE_BRIDGE_TOKEN não configurado");
+        error.code = "sao_node_bridge_nao_configurado";
+        throw error;
+    }
+    const response = await fetch(`${SAO_NODE_BASE_URL}${pathname}`, {
+        ...options,
+        headers: {
+            ...(options.headers || {}),
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${SAO_NODE_BRIDGE_TOKEN}`
+        }
+    });
+    const text = await response.text();
+    let data;
+    try { data = JSON.parse(text); } catch { data = { raw: text }; }
+    if (!response.ok) {
+        const error = new Error(data?.error?.message || data?.error || `SAO-NODE HTTP ${response.status}`);
+        error.status = response.status;
+        error.code = data?.error?.code || data?.code || `sao_node_http_${response.status}`;
+        error.data = data;
+        throw error;
+    }
+    return data;
+}
+
+// O frontend envia somente o ticket emitido pelo SAO-NODE após autenticação GM.
+// O ticket é resgatado uma vez e vira uma fila consumível pelo MonsterIA.
+app.post("/sao-node/transfers", async (req, res) => {
+    if (!originAllowed(req)) return res.status(403).json({ error: "origem_nao_autorizada" });
+    const ticket = typeof req.body?.ticket === "string" ? req.body.ticket : "";
+    if (!ticket || ticket.length > 512) return res.status(400).json({ error: "ticket_ausente" });
+    cleanupTransfers();
+    if (transfers.size >= MAX_TRANSFER_QUEUE) return res.status(429).json({ error: "fila_firecast_cheia" });
+    try {
+        const issued = await saoNodeRequest("/api/v1/firecast/transfers/redeem", {
+            method: "POST", body: JSON.stringify({ ticket })
+        });
+        const transferId = String(issued.transferId || randomToken(16));
+        const receiptToken = randomToken(32);
+        const now = Date.now();
+        transfers.set(transferId, {
+            transferId,
+            receiptToken,
+            xml: String(issued.xml || ""),
+            campaignId: issued.campaignId,
+            monsterId: issued.monsterId,
+            monsterName: issued.monsterName || "Criatura",
+            imageUrl: issued.imageUrl || "",
+            status: "queued",
+            createdAt: now,
+            updatedAt: now,
+            claimedBy: null,
+            claimedAt: 0,
+            message: ""
+        });
+        return res.status(202).json({ ok: true, transferId, receiptToken, status: "queued", monsterName: issued.monsterName || "Criatura" });
+    } catch (error) {
+        const status = error.status === 401 || error.status === 403 ? error.status : error.status || 502;
+        return res.status(status).json({ error: error.code || "sao_node_indisponivel", message: error.message });
+    }
+});
+
+// Endpoints consumidos pelo plugin. O token é configurado apenas no proxy e no
+// Firecast, nunca enviado ao frontend SAO-NODE.
+app.post("/sao-node/consumer/heartbeat", (req, res) => {
+    if (!requireFirecast(req, res)) return;
+    const consumerId = String(req.body?.consumerId || "").trim();
+    if (!consumerId || consumerId.length > 200) return res.status(400).json({ error: "consumer_id_ausente" });
+    cleanupTransfers();
+    return res.json({ ok: true, consumerId });
+});
+
+app.get("/sao-node/transfers/next", (req, res) => {
+    if (!requireFirecast(req, res)) return;
+    cleanupTransfers();
+    const consumerId = String(req.query.consumerId || "").trim();
+    if (!consumerId || consumerId.length > 200) return res.status(400).json({ error: "consumer_id_ausente" });
+    const now = Date.now();
+    let transfer = [...transfers.values()].find((item) => item.status === "queued" || (item.status === "claimed" && item.claimedAt + 30_000 < now));
+    if (!transfer) return res.status(204).end();
+    transfer.status = "claimed";
+    transfer.claimedBy = consumerId;
+    transfer.claimedAt = now;
+    transfer.updatedAt = now;
+    return res.json({ ok: true, transferId: transfer.transferId, xml: transfer.xml, monsterName: transfer.monsterName, imageUrl: transfer.imageUrl });
+});
+
+app.get("/sao-node/transfers/:transferId", (req, res) => {
+    if (!originAllowed(req)) return res.status(403).json({ error: "origem_nao_autorizada" });
+    cleanupTransfers();
+    const transfer = transfers.get(req.params.transferId);
+    if (!transfer) return res.status(404).json({ error: "transferencia_expirada" });
+    if (bearer(req) !== transfer.receiptToken && req.query.receipt !== transfer.receiptToken) return res.status(401).json({ error: "recibo_invalido" });
+    return res.json({ ok: true, transferId: transfer.transferId, status: transfer.status, monsterName: transfer.monsterName, message: transfer.message });
+});
+
+app.post("/sao-node/transfers/:transferId/ack", async (req, res) => {
+    if (!requireFirecast(req, res)) return;
+    const transfer = transfers.get(req.params.transferId);
+    if (!transfer) return res.status(404).json({ error: "transferencia_expirada" });
+    const consumerId = String(req.body?.consumerId || "");
+    const status = String(req.body?.status || "");
+    if (!consumerId || transfer.claimedBy !== consumerId || !["applied", "rejected", "failed"].includes(status)) return res.status(409).json({ error: "confirmacao_invalida" });
+    transfer.status = status;
+    transfer.message = String(req.body?.message || "").slice(0, 1000);
+    transfer.updatedAt = Date.now();
+    // Auditoria/estado no servidor é best-effort: o recibo local já é válido.
+    try {
+        await saoNodeRequest(`/api/v1/firecast/transfers/${encodeURIComponent(transfer.transferId)}/ack`, {
+            method: "POST", body: JSON.stringify({ consumerId, status, message: transfer.message })
+        });
+    } catch (error) {
+        if (error.status && error.status !== 404) console.warn("Falha ao registrar recibo no SAO-NODE:", error.message);
+    }
+    return res.json({ ok: true, transferId: transfer.transferId, status: transfer.status });
+});
 
 console.log("====================================");
 console.log(" Proxy Gemini Iniciado ");
@@ -54,6 +226,7 @@ function classifyGeminiError(response, data) {
 
 app.post("/gemini", async (req, res) => {
     try {
+        if (!API_KEY) return xmlError(res, 503, "gemini_sem_configuracao");
         console.log("==== NOVA REQUISIÇÃO RECEBIDA ====");
 
         const userPrompt = req.body.prompt;
@@ -307,8 +480,10 @@ app.post("/save-ficha", async (req, res) => {
 });
 
 
-app.listen(3000, () => {
+if (require.main === module) app.listen(Number(process.env.PORT || 3000), () => {
     console.log("====================================");
     console.log("🚀 Gemini Proxy rodando na porta 3000");
     console.log("====================================");
 });
+
+module.exports = { app, transfers, cleanupTransfers };

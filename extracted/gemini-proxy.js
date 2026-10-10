@@ -8,7 +8,7 @@ const app = express();
 app.use(express.json({ limit: "10mb" }));
 
 // SUA API KEY
-const API_KEY = "AIzaSyCzyz54cirV1USc0oCEmDKv9AruoA76k1c";
+const API_KEY = process.env.GEMINI_API_KEY || "";
 
 console.log("====================================");
 console.log(" Proxy Gemini Iniciado ");

@@ -13,6 +13,16 @@ local SceneLib = require("scene")
 
 GEMINI_PROXY_URL = GEMINI_PROXY_URL or "http://localhost:3000/gemini"
 SAO_NODE_PROXY_URL = SAO_NODE_PROXY_URL or "http://localhost:3000/sao-node/monster-xml"
+-- A ponte de transferências é autenticada somente no lado do Firecast.  O token
+-- nunca é persistido em nodes nem enviado ao navegador SAO-NODE.
+SAO_NODE_BRIDGE_URL = SAO_NODE_BRIDGE_URL or "http://localhost:3000"
+SAO_NODE_BRIDGE_TOKEN = SAO_NODE_BRIDGE_TOKEN or ""
+local saoNodeConsumerId = nil
+local saoNodeBridgePolling = false
+local saoNodeBridgeTimer = nil
+local saoNodeSeenTransfers = {}
+local saoNodeBridgePrompting = false
+local aplicarXMLNaFichaComConfirmacao
 
 ------------------------------------------------------------
 -- UTILS
@@ -23,6 +33,12 @@ local function cleanText(s)
     s = s:gsub("\r", " "):gsub("\n", " ")
     s = s:gsub("%s+", " ")
     return s:gsub("^%s+", ""):gsub("%s+$", "")
+end
+
+local function xmlDecode(s)
+    if type(s) ~= "string" then return "" end
+    return s:gsub("&lt;", "<"):gsub("&gt;", ">"):gsub("&quot;", '\"')
+        :gsub("&apos;", "'"):gsub("&amp;", "&")
 end
 
 local function normalize(s)
@@ -524,6 +540,23 @@ local function httpPOST(url, jsonStr, success, fail)
     req:send(jsonStr)
 end
 
+local function httpPOSTAuthenticated(url, jsonStr, token, success, fail)
+    local req = internet.newHTTPRequest("POST", url)
+    if req == nil then if fail then fail("newHTTPRequest nil") end return end
+    req.onResponse = function()
+        local status = req.status or 0
+        if status < 200 or status >= 300 then
+            if fail then fail("HTTP " .. tostring(status), status, req.responseText) end
+            return
+        end
+        if success then success(req.responseText, status) end
+    end
+    req.onError = function(err) if fail then fail(err) end end
+    req:setRequestHeader("Content-Type", "application/json; charset=utf-8")
+    if token and token ~= "" then req:setRequestHeader("Authorization", "Bearer " .. token) end
+    req:send(jsonStr or "")
+end
+
 local function httpGET(url, success, fail)
     local req = internet.newHTTPRequest("GET", url)
     if req == nil then
@@ -546,6 +579,22 @@ local function httpGET(url, success, fail)
         if fail then fail(err) end
     end
 
+    req:send("")
+end
+
+local function httpGETAuthenticated(url, token, success, fail)
+    local req = internet.newHTTPRequest("GET", url)
+    if req == nil then if fail then fail("newHTTPRequest nil") end return end
+    req.onResponse = function()
+        local status = req.status or 0
+        if status < 200 or status >= 300 then
+            if fail then fail("HTTP " .. tostring(status), status, req.responseText) end
+            return
+        end
+        if success then success(req.responseText, status) end
+    end
+    req.onError = function(err) if fail then fail(err) end end
+    if token and token ~= "" then req:setRequestHeader("Authorization", "Bearer " .. token) end
     req:send("")
 end
 
@@ -659,7 +708,18 @@ local function extractTag(xml, tag)
     if not xml then return "" end
     local v = xml:match("<" .. tag .. "[^>]*>%s*(.-)%s*</" .. tag .. ">")
     if not v then return "" end
-    return cleanText(v)
+    return xmlDecode(cleanText(v))
+end
+
+-- Extracts a payload without collapsing line breaks.  This is used for fields
+-- such as originalSheet and the JSON/source text where whitespace is data.
+local function extractRawTag(xml, tag)
+    if not xml then return "" end
+    local v = xml:match("<" .. tag .. "[^>]*>(.-)</" .. tag .. ">")
+    if not v then return "" end
+    local cdata = v:match("^<!%[CDATA%[(.*)%]%]>$")
+    if cdata ~= nil then v = cdata end
+    return xmlDecode(v)
 end
 
 local function ensureTokenUserData(token)
@@ -1550,6 +1610,8 @@ local function buildFichaSavePayload(nodo)
         pv = tonumber(nodo.pv) or 0,
         mana = tonumber(nodo.mana) or 0,
         defesa = tonumber(nodo.ca) or 0,
+        iniciativa = tonumber(nodo.iniciativa) or 0,
+        percepcao = tonumber(nodo.percepcao) or 0,
         deslocamento = nodo.deslocamento or "",
         att_for = tonumber(nodo.att_for) or 0,
         att_des = tonumber(nodo.att_des) or 0,
@@ -1567,6 +1629,10 @@ local function buildFichaSavePayload(nodo)
         imunidades_texto = nodo.imunidades_texto or "",
         ataques_texto = nodo.ataques_texto or "",
         habilidades_texto = nodo.habilidades_texto or "",
+        magias_texto = nodo.magias_texto or "",
+        originalSheet = nodo.originalSheet or "",
+        dadosAdicionais = nodo.dadosAdicionais or "",
+        saoNodeSourceJson = nodo.saoNodeSourceJson or "",
         monsterIA_ataques = nodo[TOKEN_ATTACKS_FIELD] or "",
         comoJogar = nodo.comoJogar or "",
         textoBrutoIA = nodo.textoBrutoIA or "",
@@ -1905,7 +1971,7 @@ local function parseCriaturaXML(xml)
     data.nd           = extractNumberTag(xml, "nd")
     data.tipo         = extractTag(xml, "tipo")
     data.tamanho      = extractTag(xml, "tamanho")
-    data.descricao    = extractTag(xml, "descricao")
+    data.descricao    = extractRawTag(xml, "descricao")
 
     data.mana         = extractNumberTag(xml, "mana")
 
@@ -1915,6 +1981,13 @@ local function parseCriaturaXML(xml)
         data.ca = extractNumberTag(xml, "defesa")
     end
     data.deslocamento = extractTag(xml, "deslocamento")
+    data.iniciativa   = extractNumberTag(xml, "iniciativa")
+    data.percepcao    = extractNumberTag(xml, "percepcao")
+    data.imagemURL    = extractTag(xml, "imagemURL")
+    if data.imagemURL == "" then data.imagemURL = extractTag(xml, "imagem") end
+    data.originalSheet = extractRawTag(xml, "originalSheet")
+    data.dadosAdicionais = extractRawTag(xml, "dadosAdicionais")
+    data.saoNodeSourceJson = extractRawTag(xml, "saoNodeSourceJson")
 
     local atr = extractBlock(xml, "atributos") or ""
     data.atributos = {
@@ -1992,8 +2065,8 @@ local function parseCriaturaXML(xml)
                 tipo        = extractTag(item, "tipo"),
                 alcance     = extractTag(item, "alcance"),
                 critico     = extractTag(item, "critico"),
-                descricao   = extractTag(item, "descricao"),
-                observacoes = extractTag(item, "observacoes")
+                descricao   = extractRawTag(item, "descricao"),
+                observacoes = extractRawTag(item, "observacoes")
             }
 
             if atk.quantidade == "" then
@@ -2047,12 +2120,12 @@ local function parseCriaturaXML(xml)
         for item in habBlock:gmatch("<item>(.-)</item>") do
             local hab = {
                 nome        = extractTag(item, "nome"),
-                descricao   = extractTag(item, "descricao"),
+                descricao   = extractRawTag(item, "descricao"),
                 tipo        = extractTag(item, "tipo"),
                 custo       = extractTag(item, "custo"),
                 recarga     = extractTag(item, "recarga"),
                 gatilho     = extractTag(item, "gatilho"),
-                observacoes = extractTag(item, "observacoes")
+                observacoes = extractRawTag(item, "observacoes")
             }
 
             hab.texto = cleanText(table.concat({
@@ -2081,6 +2154,24 @@ local function parseCriaturaXML(xml)
                     texto = itemText
                 }
             end
+        end
+    end
+
+    -- Magias não possuem uma área dedicada na ficha atual; preservamos cada
+    -- campo integralmente no texto adicional e em dataIA para futuras views.
+    data.magias = {}
+    local magBlock = extractBlock(xml, "magias")
+    if magBlock then
+        for item in magBlock:gmatch("<item>(.-)</item>") do
+            local magia = {
+                nome = extractTag(item, "nome"), descricao = extractRawTag(item, "descricao"),
+                custo = extractTag(item, "custo"), alcance = extractTag(item, "alcance"),
+                alvo = extractTag(item, "alvo"), duracao = extractTag(item, "duracao"),
+                observacoes = extractRawTag(item, "observacoes")
+            }
+            magia.texto = cleanText(table.concat({magia.nome, magia.descricao, magia.custo,
+                magia.alcance, magia.alvo, magia.duracao, magia.observacoes}, " "))
+            data.magias[#data.magias + 1] = magia
         end
     end
 
@@ -2288,6 +2379,8 @@ local function preencherFicha(ficha, nodo, data)
     nodo.tamanho      = data.tamanho or ""
     nodo.descricao    = data.descricao or ""
     nodo.deslocamento = data.deslocamento or ""
+    nodo.iniciativa   = data.iniciativa or 0
+    nodo.percepcao    = data.percepcao or 0
 
     nodo.mana = data.mana or 0
 
@@ -2310,6 +2403,11 @@ local function preencherFicha(ficha, nodo, data)
     nodo.pericias_texto = table.concat(data.pericias or {}, ", ")
     nodo.resistencias_texto = table.concat(data.resistencias or {}, ", ")
     nodo.imunidades_texto = table.concat(data.imunidades or {}, ", ")
+    nodo.magias_texto = table.concat((function()
+        local lista = {}
+        for _, magia in ipairs(data.magias or {}) do lista[#lista + 1] = magia.texto or magia.nome or "" end
+        return lista
+    end)(), " | ")
     nodo.ataques_texto = table.concat((function()
         local lista = {}
         for _, atk in ipairs(data.ataques or {}) do
@@ -2324,6 +2422,11 @@ local function preencherFicha(ficha, nodo, data)
         end
         return lista
     end)(), " | ")
+    -- Campos sem equivalente no template continuam acessíveis e exportáveis.
+    nodo.originalSheet = data.originalSheet or ""
+    nodo.dadosAdicionais = data.dadosAdicionais or ""
+    nodo.saoNodeSourceJson = data.saoNodeSourceJson or ""
+    if data.imagemURL and data.imagemURL ~= "" then nodo.imagemURL = data.imagemURL end
     nodo[TOKEN_ATTACKS_FIELD] = encodeTokenAttacks(data.ataques or {})
     nodo.comoJogar = buildHowToPlayText(data)
 
@@ -2375,15 +2478,15 @@ local function chamarOpenAI(ficha, nodo, texto)
         GEMINI_PROXY_URL,
         body,
         function(xml)
-            local ok, erro = aplicarXMLNaFicha(ficha, nodo, xml)
-            if not ok then
-                if erro then
-                    showMessage(mensagemAmigavelGemini(erro, 200, xml))
-                else
-                    showMessage("A IA respondeu, mas nao consegui montar uma ficha valida. Tente novamente ou ajuste o texto da criatura.")
+            aplicarXMLNaFichaComConfirmacao(ficha, nodo, xml, function(ok, erro)
+                if not ok then
+                    if erro then
+                        showMessage(mensagemAmigavelGemini(erro, 200, xml))
+                    else
+                        showMessage("A IA respondeu, mas nao consegui montar uma ficha valida. Tente novamente ou ajuste o texto da criatura.")
+                    end
                 end
-                return
-            end
+            end)
         end,
         function(err, status, responseText)
             showMessage(mensagemAmigavelGemini(err, status, responseText))
@@ -2422,15 +2525,15 @@ local function buscarDoSaoNode(ficha, nodo, campaignId, monsterId)
     httpGET(
         url,
         function(xml)
-            local ok, erro = aplicarXMLNaFicha(ficha, nodo, xml)
-            if not ok then
-                if erro then
-                    showMessage(mensagemAmigavelSaoNode(erro, 200, xml))
-                else
-                    showMessage("O SAO-NODE respondeu, mas nao consegui montar uma ficha valida para esse monstro.")
+            aplicarXMLNaFichaComConfirmacao(ficha, nodo, xml, function(ok, erro)
+                if not ok then
+                    if erro then
+                        showMessage(mensagemAmigavelSaoNode(erro, 200, xml))
+                    else
+                        showMessage("O SAO-NODE respondeu, mas nao consegui montar uma ficha valida para esse monstro.")
+                    end
                 end
-                return
-            end
+            end)
         end,
         function(err, status, responseText)
             showMessage(mensagemAmigavelSaoNode(err, status, responseText))
@@ -2446,6 +2549,163 @@ function askSaoNodeAndFill(ficha, nodo)
     local campaignId = nodo and nodo.saoNodeCampaignId or ""
     local monsterId = nodo and nodo.saoNodeMonsterId or ""
     buscarDoSaoNode(ficha, nodo, campaignId, monsterId)
+end
+
+------------------------------------------------------------
+-- PONTE AUTENTICADA SAO-NODE -> FIRECAST
+------------------------------------------------------------
+
+local function bridgeNewConsumerId()
+    math.randomseed(os.time())
+    return string.format("firecast-%d-%d-%d", os.time(), math.random(100000, 999999), math.random(100000, 999999))
+end
+
+local function bridgeTokenReady(ficha, callback)
+    if SAO_NODE_BRIDGE_TOKEN ~= nil and SAO_NODE_BRIDGE_TOKEN ~= "" then
+        callback(SAO_NODE_BRIDGE_TOKEN)
+        return
+    end
+    if saoNodeBridgePrompting then return end
+    saoNodeBridgePrompting = true
+    dialogs.inputQuery("Conectar ao SAO-NODE", "Token da ponte Firecast (fica somente nesta sessão):", "", function(value)
+        saoNodeBridgePrompting = false
+        if value and value ~= "" then
+            SAO_NODE_BRIDGE_TOKEN = tostring(value)
+            callback(SAO_NODE_BRIDGE_TOKEN)
+        else
+            showMessage("Informe o token da ponte para receber transferências do SAO-NODE.")
+        end
+    end, function()
+        saoNodeBridgePrompting = false
+    end, false)
+end
+
+local function bridgeAck(transferId, status, message)
+    if not transferId or transferId == "" or not saoNodeConsumerId then return end
+    local body = json.encode({consumerId = saoNodeConsumerId, status = status, message = message or ""})
+    httpPOSTAuthenticated(SAO_NODE_BRIDGE_URL .. "/sao-node/transfers/" .. urlEncode(transferId) .. "/ack", body,
+        SAO_NODE_BRIDGE_TOKEN, function() end, function() end)
+end
+
+local function nodeHasMeaningfulData(node)
+    if type(node) ~= "table" then return false end
+    return cleanText(node.nome or "") ~= ""
+        or tonumber(node.pv or 0) ~= 0
+        or tonumber(node.ca or 0) ~= 0
+        or cleanText(node.descricao or "") ~= ""
+        or cleanText(node.xmlCriatura or "") ~= ""
+        or cleanText(node.originalSheet or "") ~= ""
+        or cleanText(node.dadosAdicionais or "") ~= ""
+        or cleanText(node.imagemURL or "") ~= ""
+end
+
+aplicarXMLNaFichaComConfirmacao = function(ficha, nodo, xml, onDone)
+    local function finish()
+        if ficha and ficha.rclMonstros and ficha.rclMonstros.selectedNode ~= nodo then
+            if onDone then onDone(false, "a ficha selecionada mudou durante a confirmação") end
+            return
+        end
+        local ok, erro = aplicarXMLNaFicha(ficha, nodo, xml)
+        if onDone then onDone(ok, erro) end
+    end
+    if nodeHasMeaningfulData(nodo) then
+        dialogs.confirmYesNo("A ficha selecionada já está preenchida. Substituir os dados atuais?", function(confirmed)
+            if confirmed then finish() elseif onDone then onDone(false, "substituição cancelada") end
+        end)
+    else
+        finish()
+    end
+end
+
+local function bridgeCanWrite(ficha)
+    local mesa = nil
+    pcall(function() mesa = Firecast.getMesaDe(ficha) end)
+    if mesa == nil or mesa.me == nil then return true end
+    -- Em mesas reais somente o mestre pode consumir e substituir fichas.
+    if mesa.me.isMestre ~= nil then return mesa.me.isMestre == true end
+    if mesa.me.isMaster ~= nil then return mesa.me.isMaster == true end
+    return true
+end
+
+local function applyBridgeTransfer(ficha, transfer)
+    local transferId = tostring(transfer.transferId or transfer.id or "")
+    local xml = transfer.xml or transfer.xmlCriatura or ""
+    if transferId == "" or xml == "" then
+        bridgeAck(transferId, "failed", "transferência sem XML ou identificador")
+        return
+    end
+    if saoNodeSeenTransfers[transferId] then return end
+    local node = ficha and ficha.rclMonstros and ficha.rclMonstros.selectedNode
+    if node == nil then
+        -- Não confirme ainda: a fila mantém um lease e tentará novamente
+        -- quando o mestre selecionar uma ficha.
+        return
+    end
+    saoNodeSeenTransfers[transferId] = true
+    local function doApply()
+        if not ficha.rclMonstros or ficha.rclMonstros.selectedNode ~= node then
+            bridgeAck(transferId, "rejected", "a ficha selecionada mudou durante a confirmação")
+            return
+        end
+        local ok, erro = aplicarXMLNaFicha(ficha, node, xml)
+        if ok then
+            node.saoNodeTransferId = transferId
+            bridgeAck(transferId, "applied", "Ficha aplicada no MonsterIA")
+        else
+            bridgeAck(transferId, "failed", tostring(erro or "XML inválido"))
+            showMessage("Não consegui aplicar o monstro recebido do SAO-NODE.")
+        end
+    end
+    if nodeHasMeaningfulData(node) then
+        dialogs.confirmYesNo("A ficha selecionada já está preenchida. Substituir pelos dados recebidos do SAO-NODE?", function(confirmed)
+            if confirmed then doApply() else bridgeAck(transferId, "rejected", "substituição cancelada pelo mestre") end
+        end)
+    else
+        doApply()
+    end
+end
+
+local function pollSaoNodeBridge(ficha)
+    bridgeTokenReady(ficha, function(token)
+        if not saoNodeConsumerId then saoNodeConsumerId = bridgeNewConsumerId() end
+        local heartbeatBody = json.encode({consumerId = saoNodeConsumerId})
+        httpPOSTAuthenticated(SAO_NODE_BRIDGE_URL .. "/sao-node/consumer/heartbeat", heartbeatBody, token,
+            function()
+                local url = SAO_NODE_BRIDGE_URL .. "/sao-node/transfers/next?consumerId=" .. urlEncode(saoNodeConsumerId)
+                httpGETAuthenticated(url, token, function(body)
+                    local ok, payload = pcall(function() return json.decode(body or "") end)
+                    if ok and type(payload) == "table" then
+                        local transfer = payload.transfer or payload
+                        if type(transfer) == "table" and (transfer.transferId or transfer.id) then
+                            applyBridgeTransfer(ficha, transfer)
+                        end
+                    end
+                end, function(err, status)
+                    if status and status ~= 404 and status ~= 204 then
+                        -- O polling é silencioso; erros explícitos aparecem apenas no botão manual.
+                    end
+                end)
+            end, function() end)
+    end)
+end
+
+function iniciarRecepcaoSaoNode(ficha)
+    if not bridgeCanWrite(ficha) then
+        showMessage("Somente o mestre pode receber monstros do SAO-NODE.")
+        return
+    end
+    if saoNodeBridgePolling then return end
+    saoNodeBridgePolling = true
+    pollSaoNodeBridge(ficha)
+    saoNodeBridgeTimer = setInterval(function() pollSaoNodeBridge(ficha) end, 3000)
+end
+
+function receberDoSaoNode(ficha)
+    if not bridgeCanWrite(ficha) then
+        showMessage("Somente o mestre pode receber monstros do SAO-NODE.")
+        return
+    end
+    pollSaoNodeBridge(ficha)
 end
 
 ------------------------------------------------------------

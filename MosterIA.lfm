@@ -61,8 +61,14 @@
         ----------------------------------------------------------------
         function onNodeReady(self)
             atualizarMana(self)
+            iniciarRecepcaoSaoNode(self)
         end
+
     ]]></script>
+
+    <event name="onNodeReady">
+        onNodeReady(self)
+    </event>
 
     <!-- BOTAO NOVO MONSTRO / TESTE -->
     <layout align="top" height="30" margins="{bottom=4}">
@@ -98,6 +104,7 @@
 
             if node ~= nil then
                 atualizarMana(self)
+                iniciarRecepcaoSaoNode(self)
             end
         </event>
     </recordList>
@@ -172,6 +179,14 @@
                                 askSaoNodeAndFill(self, self.box.node)
                             </event>
                         </button>
+                        <button text="Receber do SAO-NODE"
+                            align="left" width="190"
+                            margins="{left=8}"
+                            fontColor="#66CCFF">
+                            <event name="onClick">
+                                receberDoSaoNode(self)
+                            </event>
+                        </button>
                     </layout>
 
                     <!-- CAMPOS BASICOS -->
@@ -223,6 +238,13 @@
 
                         <label align="left" width="110" text="Deslocamento:" margins="{left=10}" />
                         <edit align="left" width="120" field="deslocamento" />
+                    </layout>
+
+                    <layout align="top" height="30" margins="{top=4}">
+                        <label align="left" width="90" text="Iniciativa:" />
+                        <edit align="left" width="70" field="iniciativa" />
+                        <label align="left" width="90" text="Percepcao:" margins="{left=12}" />
+                        <edit align="left" width="70" field="percepcao" />
                     </layout>
 
                     <!-- ATRIBUTOS (labels = botoes) -->
@@ -324,6 +346,15 @@
                             align="left"
                             width="900"
                             height="80" />
+                    </layout>
+
+                    <layout align="top" height="110" margins="{top=8}">
+                        <label text="Dados adicionais / campos sem equivalente:" align="top" height="20" />
+                        <textEditor field="dadosAdicionais" align="client" height="80" readOnly="true" />
+                    </layout>
+                    <layout align="top" height="110" margins="{top=8}">
+                        <label text="originalSheet:" align="top" height="20" />
+                        <textEditor field="originalSheet" align="client" height="80" readOnly="true" />
                     </layout>
 
                     <!-- EXCLUIR -->
