@@ -11,17 +11,32 @@ local Firecast = require("firecast")
 local rrpg     = require("rrpg")
 local SceneLib = require("scene")
 
-GEMINI_PROXY_URL = GEMINI_PROXY_URL or "http://localhost:7000/gemini"
-SAO_NODE_PROXY_URL = SAO_NODE_PROXY_URL or "http://localhost:7000/sao-node/monster-xml"
--- A ponte de transferências é autenticada somente no lado do Firecast.  O token
--- nunca é persistido em nodes nem enviado ao navegador SAO-NODE.
-SAO_NODE_BRIDGE_URL = SAO_NODE_BRIDGE_URL or "http://localhost:7000"
-SAO_NODE_BRIDGE_TOKEN = SAO_NODE_BRIDGE_TOKEN or ""
-local saoNodeConsumerId = nil
-local saoNodeBridgePolling = false
-local saoNodeBridgeTimer = nil
-local saoNodeSeenTransfers = {}
-local saoNodeBridgePrompting = false
+GEMINI_PROXY_URL = GEMINI_PROXY_URL or "http://127.0.0.1:7000/gemini"
+-- A ponte usa somente HTTP local. Não há token, cookie ou ID de campanha
+-- configurável no Firecast: o proxy entrega cada transferência enfileirada.
+-- Esta rota continua disponível para a ação manual "Buscar do SAO-NODE".
+SAO_NODE_PROXY_URL = SAO_NODE_PROXY_URL or "http://127.0.0.1:7000/sao-node/monster-xml"
+SAO_NODE_BRIDGE_URL = SAO_NODE_BRIDGE_URL or "http://127.0.0.1:7000"
+local BRIDGE_POLL_INTERVAL_MS = 3000
+local BRIDGE_REQUEST_TIMEOUT_MS = 10000
+local saoNodeBridge = {
+    consumerId = nil,
+    timer = nil,
+    enabled = false,
+    targetForm = nil,
+    inFlight = false,
+    activeRequest = nil,
+    generation = 0,
+    forms = {},
+    seen = {},
+    pendingAcks = {},
+    ackRequests = {},
+    connection = nil,
+    lastStatus = "",
+    statusCode = "paused",
+    statusDetail = "",
+    lastTransferDetail = ""
+}
 local aplicarXMLNaFichaComConfirmacao
 
 ------------------------------------------------------------
@@ -514,88 +529,109 @@ local function urlEncode(s)
     return s
 end
 
-local function httpPOST(url, jsonStr, success, fail)
-    local req = internet.newHTTPRequest("POST", url)
+local function imageURLForDisplay(imageUrl)
+    imageUrl = cleanText(imageUrl or "")
+    if imageUrl == "" then return "" end
+    imageUrl = imageURLForSource(imageUrl)
+    if not imageUrl:match("^https?://") then return imageUrl end
+    local relayPrefix = SAO_NODE_BRIDGE_URL .. "/sao-node/image?url="
+    if imageUrl:sub(1, #relayPrefix) == relayPrefix then return imageUrl end
+    return relayPrefix .. urlEncode(imageUrl)
+end
+
+function imageURLForSource(imageUrl)
+    imageUrl = cleanText(imageUrl or "")
+    if imageUrl:match("^http://127%.0%.0%.1:3001/api/v1/firecast/images/") then
+        return imageUrl:gsub("^http://127%.0%.0%.1:3001/", "http://localhost:3001/")
+    end
+    return imageUrl
+end
+
+function atualizarImagemDaFicha(ficha, nodo)
+    local imageControl = ficha and GUI.findControlByName("imgImagem", ficha) or nil
+    if imageControl ~= nil then
+        pcall(function() imageControl.src = imageURLForDisplay(nodo and nodo.imagemURL or "") end)
+    end
+end
+
+function agendarAtualizacaoImagemDaFicha(ficha, nodo)
+    if ficha == nil then return end
+    local function atualizar()
+        local box = ficha.box
+        local atual = box and box.node or nil
+        if atual == nil or atual == nodo then
+            atualizarImagemDaFicha(ficha, nodo)
+        end
+    end
+    if type(setTimeout) == "function" then
+        pcall(function() setTimeout(atualizar, 1) end)
+    else
+        atualizar()
+    end
+end
+
+local function httpRequest(method, url, body, success, fail)
+    local req = internet.newHTTPRequest(method, url)
     if req == nil then
-        if fail then fail("newHTTPRequest nil") end
+        if fail then fail("newHTTPRequest nil", 0, "") end
         return
     end
 
-    req.onResponse = function()
-        local status = req.status or 0
+    local finished = false
+    local timeoutId = nil
+    local function finishError(err, status, responseText)
+        if finished then return end
+        finished = true
+        if timeoutId ~= nil then pcall(clearTimeout, timeoutId) end
+        if fail then fail(err, status or 0, responseText or "") end
+    end
+    local function finishSuccess(responseText, status)
+        if finished then return end
+        finished = true
+        if timeoutId ~= nil then pcall(clearTimeout, timeoutId) end
+        if success then success(responseText or "", status or 0) end
+    end
 
-        if status ~= 200 then
-            if fail then fail("HTTP " .. tostring(status), status, req.responseText) end
+    timeoutId = setTimeout(function()
+        if finished then return end
+        pcall(function() req:abort() end)
+        finishError("timeout", 0, "")
+    end, BRIDGE_REQUEST_TIMEOUT_MS)
+
+    req.onResponse = function()
+        local status = tonumber(req.status or 0) or 0
+        if status < 200 or status >= 300 then
+            finishError("HTTP " .. tostring(status), status, req.responseText)
             return
         end
-
-        if success then success(req.responseText) end
+        finishSuccess(req.responseText, status)
     end
 
     req.onError = function(err)
-        if fail then fail(err) end
+        local status = tonumber(req.status or 0) or 0
+        if status == 0 then
+            local statusText = tostring(req.statusText or "")
+            local errorText = tostring(err or "")
+            status = tonumber(statusText:match("^%s*(%d%d%d)%s")
+                or statusText:match("^%s*HTTP/%S+%s+(%d%d%d)")
+                or errorText:match("^%s*HTTP/%S+%s+(%d%d%d)")) or 0
+        end
+        finishError(err, status, req.responseText)
     end
 
-    req:setRequestHeader("Content-Type", "application/json; charset=utf-8")
-    req:send(jsonStr)
+    if method == "POST" then
+        req:setRequestHeader("Content-Type", "application/json; charset=utf-8")
+    end
+    req:send(body or "")
+    return req
 end
 
-local function httpPOSTAuthenticated(url, jsonStr, token, success, fail)
-    local req = internet.newHTTPRequest("POST", url)
-    if req == nil then if fail then fail("newHTTPRequest nil") end return end
-    req.onResponse = function()
-        local status = req.status or 0
-        if status < 200 or status >= 300 then
-            if fail then fail("HTTP " .. tostring(status), status, req.responseText) end
-            return
-        end
-        if success then success(req.responseText, status) end
-    end
-    req.onError = function(err) if fail then fail(err) end end
-    req:setRequestHeader("Content-Type", "application/json; charset=utf-8")
-    if token and token ~= "" then req:setRequestHeader("Authorization", "Bearer " .. token) end
-    req:send(jsonStr or "")
+local function httpPOST(url, jsonStr, success, fail)
+    return httpRequest("POST", url, jsonStr, success, fail)
 end
 
 local function httpGET(url, success, fail)
-    local req = internet.newHTTPRequest("GET", url)
-    if req == nil then
-        if fail then fail("newHTTPRequest nil") end
-        return
-    end
-
-    req.onResponse = function()
-        local status = req.status or 0
-
-        if status ~= 200 then
-            if fail then fail("HTTP " .. tostring(status), status, req.responseText) end
-            return
-        end
-
-        if success then success(req.responseText) end
-    end
-
-    req.onError = function(err)
-        if fail then fail(err) end
-    end
-
-    req:send("")
-end
-
-local function httpGETAuthenticated(url, token, success, fail)
-    local req = internet.newHTTPRequest("GET", url)
-    if req == nil then if fail then fail("newHTTPRequest nil") end return end
-    req.onResponse = function()
-        local status = req.status or 0
-        if status < 200 or status >= 300 then
-            if fail then fail("HTTP " .. tostring(status), status, req.responseText) end
-            return
-        end
-        if success then success(req.responseText, status) end
-    end
-    req.onError = function(err) if fail then fail(err) end end
-    if token and token ~= "" then req:setRequestHeader("Authorization", "Bearer " .. token) end
-    req:send("")
+    return httpRequest("GET", url, "", success, fail)
 end
 
 local function extractErroXML(xml)
@@ -672,31 +708,24 @@ local function mensagemAmigavelSaoNode(err, status, responseText)
     if codigo == "parametros_ausentes" then
         return "Informe a campanha e o ID do monstro no SAO-NODE antes de buscar a ficha."
     end
-
     if codigo == "sao_node_sem_sessao" then
         return "O proxy local nao tem uma sessao configurada para o SAO-NODE. Configure SAO_NODE_SESSION_COOKIE e reinicie o proxy."
     end
-
     if codigo == "sao_node_nao_autorizado" or statusNum == 401 or statusNum == 403 then
         return "A sessao do SAO-NODE nao tem permissao de mestre nessa campanha, ou expirou."
     end
-
     if codigo == "sao_node_monstro_nao_encontrado" or statusNum == 404 then
         return "Nao encontrei esse monstro na campanha informada do SAO-NODE."
     end
-
     if codigo == "sao_node_erro" or codigo == "sao_node_proxy_erro" then
         return "O SAO-NODE recusou a solicitacao agora. Tente novamente em instantes."
     end
-
     if textoErro:find("newHTTPRequest", 1, true) then
         return "Nao consegui iniciar a conexao com o proxy local do SAO-NODE."
     end
-
     if textoErro:find("HTTP", 1, true) or statusNum >= 500 then
         return "O proxy local do SAO-NODE encontrou um problema. Verifique se ele esta aberto e tente novamente."
     end
-
     return "Nao consegui buscar o monstro no SAO-NODE agora. Verifique o proxy local e tente novamente."
 end
 
@@ -1650,7 +1679,7 @@ function salvarFichaLocalmente(nodo)
     local body = json.encode({ ficha = buildFichaSavePayload(nodo) })
 
     httpPOST(
-        "http://localhost:7000/save-ficha",
+        "http://127.0.0.1:7000/save-ficha",
         body,
         function(responseText)
             local ok, payload = pcall(function() return json.decode(responseText) end)
@@ -1710,7 +1739,7 @@ function aplicarFichaNoTokenSelecionado(nodo)
     token.barValue3 = ca
     token.barMax3 = ""
 
-    local imagemURL = cleanText(nodo.imagemURL or "")
+    local imagemURL = imageURLForDisplay(nodo.imagemURL or "")
     if imagemURL ~= "" and token.image ~= nil then
         pcall(function()
             token.image.url = imagemURL
@@ -2426,14 +2455,17 @@ local function preencherFicha(ficha, nodo, data)
     nodo.originalSheet = data.originalSheet or ""
     nodo.dadosAdicionais = data.dadosAdicionais or ""
     nodo.saoNodeSourceJson = data.saoNodeSourceJson or ""
-    if data.imagemURL and data.imagemURL ~= "" then nodo.imagemURL = data.imagemURL end
+    if data.imagemURL and data.imagemURL ~= "" then nodo.imagemURL = imageURLForSource(data.imagemURL) end
     nodo[TOKEN_ATTACKS_FIELD] = encodeTokenAttacks(data.ataques or {})
     nodo.comoJogar = buildHowToPlayText(data)
 
     nodo.dataIA = data
 
-    -- recria botÃµes sempre a partir do node
-    rebuildButtonsFromNode(ficha, nodo)
+    -- A ficha deve ser recebida mesmo se a reconstruÃ§Ã£o visual dos botÃµes
+    -- dinÃ¢micos nÃ£o estiver disponÃ­vel nesta versÃ£o do Firecast.
+    pcall(rebuildButtonsFromNode, ficha, nodo)
+    atualizarImagemDaFicha(ficha, nodo)
+    agendarAtualizacaoImagemDaFicha(ficha, nodo)
 end
 
 ------------------------------------------------------------
@@ -2455,6 +2487,39 @@ local function aplicarXMLNaFicha(ficha, nodo, xml)
 
     preencherFicha(ficha, nodo, data)
     return true
+end
+
+local function nodeHasMeaningfulData(node)
+    if type(node) ~= "table" then return false end
+    return cleanText(node.nome or "") ~= ""
+        or tonumber(node.pv or 0) ~= 0
+        or tonumber(node.ca or 0) ~= 0
+        or cleanText(node.descricao or "") ~= ""
+        or cleanText(node.xmlCriatura or "") ~= ""
+        or cleanText(node.originalSheet or "") ~= ""
+        or cleanText(node.dadosAdicionais or "") ~= ""
+        or cleanText(node.imagemURL or "") ~= ""
+end
+
+-- Preserve the existing IA workflow: only that manual action may ask before
+-- replacing a ficha already selected by the user. The SAO-NODE bridge creates
+-- a new node and calls aplicarXMLNaFicha directly.
+aplicarXMLNaFichaComConfirmacao = function(ficha, nodo, xml, onDone)
+    local function finish()
+        if ficha and ficha.rclMonstros and ficha.rclMonstros.selectedNode ~= nodo then
+            if onDone then onDone(false, "a ficha selecionada mudou durante a confirmação") end
+            return
+        end
+        local ok, erro = aplicarXMLNaFicha(ficha, nodo, xml)
+        if onDone then onDone(ok, erro) end
+    end
+    if nodeHasMeaningfulData(nodo) then
+        dialogs.confirmYesNo("A ficha selecionada já está preenchida. Substituir os dados atuais?", function(confirmed)
+            if confirmed then finish() elseif onDone then onDone(false, "substituição cancelada") end
+        end)
+    else
+        finish()
+    end
 end
 
 ------------------------------------------------------------
@@ -2512,7 +2577,6 @@ local function buscarDoSaoNode(ficha, nodo, campaignId, monsterId)
         showMessage("Nao encontrei a ficha selecionada para preencher.")
         return
     end
-
     if not campaignId or campaignId == "" or not monsterId or monsterId == "" then
         showMessage("Informe a campanha e o ID do monstro no SAO-NODE antes de buscar a ficha.")
         return
@@ -2521,7 +2585,6 @@ local function buscarDoSaoNode(ficha, nodo, campaignId, monsterId)
     local url = SAO_NODE_PROXY_URL
         .. "?campaignId=" .. urlEncode(campaignId)
         .. "&monsterId=" .. urlEncode(monsterId)
-
     httpGET(
         url,
         function(xml)
@@ -2541,171 +2604,420 @@ local function buscarDoSaoNode(ficha, nodo, campaignId, monsterId)
     )
 end
 
-------------------------------------------------------------
--- FunÃ§Ã£o pÃºblica usada pelo formulÃ¡rio
-------------------------------------------------------------
-
 function askSaoNodeAndFill(ficha, nodo)
     local campaignId = nodo and nodo.saoNodeCampaignId or ""
     local monsterId = nodo and nodo.saoNodeMonsterId or ""
     buscarDoSaoNode(ficha, nodo, campaignId, monsterId)
 end
 
-------------------------------------------------------------
--- PONTE AUTENTICADA SAO-NODE -> FIRECAST
-------------------------------------------------------------
+-- PONTE SAO-NODE -> FIRECAST
+-- Esta é uma fila local sem autenticação: um único consumidor global atende
+-- todas as janelas do formulário e confirma somente depois de criar a ficha.
 
 local function bridgeNewConsumerId()
     math.randomseed(os.time())
     return string.format("firecast-%d-%d-%d", os.time(), math.random(100000, 999999), math.random(100000, 999999))
 end
 
-local function bridgeTokenReady(ficha, callback)
-    if SAO_NODE_BRIDGE_TOKEN ~= nil and SAO_NODE_BRIDGE_TOKEN ~= "" then
-        callback(SAO_NODE_BRIDGE_TOKEN)
-        return
-    end
-    if saoNodeBridgePrompting then return end
-    saoNodeBridgePrompting = true
-    dialogs.inputQuery("Conectar ao SAO-NODE", "Token da ponte Firecast (fica somente nesta sessão):", "", function(value)
-        saoNodeBridgePrompting = false
-        if value and value ~= "" then
-            SAO_NODE_BRIDGE_TOKEN = tostring(value)
-            callback(SAO_NODE_BRIDGE_TOKEN)
-        else
-            showMessage("Informe o token da ponte para receber transferências do SAO-NODE.")
+local function bridgeStatusText(code, detail)
+    local labels = {
+        paused = "Pausado",
+        connecting = "Conectando",
+        waiting = "Aguardando fichas",
+        applying = "Aplicando",
+        confirming = "Confirmando",
+        received = "Recebido",
+        offline = "Proxy offline",
+        error = "Erro"
+    }
+    local label = labels[code] or "Estado"
+    detail = tostring(detail or "")
+    if detail == "" or detail == label then return label end
+    return label .. ": " .. detail
+end
+
+local function bridgeRenderStatus(form)
+    if form == nil then return end
+    pcall(function()
+        if form.lblSaoNodeStatus ~= nil then
+            form.lblSaoNodeStatus.text = bridgeStatusText(saoNodeBridge.statusCode, saoNodeBridge.statusDetail)
         end
-    end, function()
-        saoNodeBridgePrompting = false
-    end, false)
+        if form.btnAguardarFichas ~= nil then
+            form.btnAguardarFichas.text = saoNodeBridge.enabled and saoNodeBridge.targetForm == form
+                and "Pausar recebimento" or "Aguardar fichas"
+        end
+    end)
 end
 
-local function bridgeAck(transferId, status, message)
-    if not transferId or transferId == "" or not saoNodeConsumerId then return end
-    local body = json.encode({consumerId = saoNodeConsumerId, status = status, message = message or ""})
-    httpPOSTAuthenticated(SAO_NODE_BRIDGE_URL .. "/sao-node/transfers/" .. urlEncode(transferId) .. "/ack", body,
-        SAO_NODE_BRIDGE_TOKEN, function() end, function() end)
+local function bridgeSetStatus(code, detail)
+    saoNodeBridge.statusCode = code or "paused"
+    saoNodeBridge.statusDetail = tostring(detail or "")
+    saoNodeBridge.lastStatus = bridgeStatusText(saoNodeBridge.statusCode, saoNodeBridge.statusDetail)
+    for _, form in ipairs(saoNodeBridge.forms) do bridgeRenderStatus(form) end
+    if saoNodeBridge.targetForm ~= nil then bridgeRenderStatus(saoNodeBridge.targetForm) end
 end
 
-local function nodeHasMeaningfulData(node)
-    if type(node) ~= "table" then return false end
-    return cleanText(node.nome or "") ~= ""
-        or tonumber(node.pv or 0) ~= 0
-        or tonumber(node.ca or 0) ~= 0
-        or cleanText(node.descricao or "") ~= ""
-        or cleanText(node.xmlCriatura or "") ~= ""
-        or cleanText(node.originalSheet or "") ~= ""
-        or cleanText(node.dadosAdicionais or "") ~= ""
-        or cleanText(node.imagemURL or "") ~= ""
+function atualizarStatusRecepcaoSaoNode(form)
+    bridgeRenderStatus(form or saoNodeBridge.targetForm)
 end
 
-aplicarXMLNaFichaComConfirmacao = function(ficha, nodo, xml, onDone)
-    local function finish()
-        if ficha and ficha.rclMonstros and ficha.rclMonstros.selectedNode ~= nodo then
-            if onDone then onDone(false, "a ficha selecionada mudou durante a confirmação") end
+local function bridgeReport(message, code)
+    message = tostring(message or "")
+    if message ~= "" then bridgeSetStatus(code or "error", message) end
+end
+
+local function bridgeConnection(connected)
+    saoNodeBridge.connection = connected
+    if connected then
+        if saoNodeBridge.enabled and (saoNodeBridge.statusCode == "connecting" or saoNodeBridge.statusCode == "offline") then
+            bridgeSetStatus("waiting", "Aguardando fichas" .. (saoNodeBridge.lastTransferDetail ~= "" and "; última: " .. saoNodeBridge.lastTransferDetail or ""))
+        end
+    elseif saoNodeBridge.enabled then
+        bridgeSetStatus("offline", "Inicie o proxy em 127.0.0.1:7000")
+    end
+end
+
+local function bridgeFormAlive(form)
+    if form == nil then return false end
+    local ok, alive = pcall(function()
+        if form.rclMonstros == nil or (form.handle ~= nil and form.handle == 0) then return false end
+        return true
+    end)
+    return ok and alive == true
+end
+
+local function bridgePruneForms()
+    for i = #saoNodeBridge.forms, 1, -1 do
+        if not bridgeFormAlive(saoNodeBridge.forms[i]) then
+            table.remove(saoNodeBridge.forms, i)
+        end
+    end
+end
+
+local function bridgeRegisterForm(form)
+    bridgePruneForms()
+    for _, current in ipairs(saoNodeBridge.forms) do
+        if current == form then
+            bridgeRenderStatus(form)
             return
         end
-        local ok, erro = aplicarXMLNaFicha(ficha, nodo, xml)
-        if onDone then onDone(ok, erro) end
     end
-    if nodeHasMeaningfulData(nodo) then
-        dialogs.confirmYesNo("A ficha selecionada já está preenchida. Substituir os dados atuais?", function(confirmed)
-            if confirmed then finish() elseif onDone then onDone(false, "substituição cancelada") end
-        end)
-    else
-        finish()
+    if bridgeFormAlive(form) then
+        saoNodeBridge.forms[#saoNodeBridge.forms + 1] = form
+        bridgeRenderStatus(form)
     end
+end
+
+local function bridgeCurrentForm()
+    bridgePruneForms()
+    if saoNodeBridge.targetForm ~= nil and bridgeFormAlive(saoNodeBridge.targetForm) then
+        return saoNodeBridge.targetForm
+    end
+    return nil
+end
+
+local function bridgeAck(transferId, status, message, onConfirmed)
+    if not transferId or transferId == "" or not saoNodeBridge.consumerId then return end
+    if saoNodeBridge.ackRequests[transferId] ~= nil then return end
+    local cycle = saoNodeBridge.generation
+    local receiptToRetry = {status = status, message = message or "", onConfirmed = onConfirmed}
+    saoNodeBridge.pendingAcks[transferId] = receiptToRetry
+    local body = json.encode({
+        consumerId = saoNodeBridge.consumerId,
+        status = status,
+        message = message or ""
+    })
+    local request = httpPOST(
+        SAO_NODE_BRIDGE_URL .. "/sao-node/transfers/" .. urlEncode(transferId) .. "/ack",
+        body,
+        function(responseBody)
+            if not saoNodeBridge.enabled or cycle ~= saoNodeBridge.generation then return end
+            saoNodeBridge.ackRequests[transferId] = nil
+            local decoded, receipt = pcall(function() return json.decode(responseBody or "") end)
+            if not decoded or type(receipt) ~= "table" or receipt.ok ~= true or receipt.status ~= status then
+                bridgeReport("Confirmacao: resposta invalida do proxy; " .. tostring(responseBody or ""), "error")
+                return
+            end
+            saoNodeBridge.pendingAcks[transferId] = nil
+            if onConfirmed then onConfirmed() end
+        end,
+        function(err, statusCode, responseText)
+            if not saoNodeBridge.enabled or cycle ~= saoNodeBridge.generation then return end
+            saoNodeBridge.ackRequests[transferId] = nil
+            bridgeReport("Confirmacao: " .. tostring(err or "erro") .. " (HTTP " .. tostring(statusCode or 0) .. "); " .. tostring(responseText or ""), "error")
+        end
+    )
+    saoNodeBridge.ackRequests[transferId] = request
 end
 
 local function bridgeCanWrite(ficha)
     local mesa = nil
     pcall(function() mesa = Firecast.getMesaDe(ficha) end)
     if mesa == nil or mesa.me == nil then return true end
-    -- Em mesas reais somente o mestre pode consumir e substituir fichas.
     if mesa.me.isMestre ~= nil then return mesa.me.isMestre == true end
     if mesa.me.isMaster ~= nil then return mesa.me.isMaster == true end
     return true
 end
 
-local function applyBridgeTransfer(ficha, transfer)
-    local transferId = tostring(transfer.transferId or transfer.id or "")
-    local xml = transfer.xml or transfer.xmlCriatura or ""
-    if transferId == "" or xml == "" then
-        bridgeAck(transferId, "failed", "transferência sem XML ou identificador")
-        return
-    end
-    if saoNodeSeenTransfers[transferId] then return end
-    local node = ficha and ficha.rclMonstros and ficha.rclMonstros.selectedNode
-    if node == nil then
-        -- Não confirme ainda: a fila mantém um lease e tentará novamente
-        -- quando o mestre selecionar uma ficha.
-        return
-    end
-    saoNodeSeenTransfers[transferId] = true
-    local function doApply()
-        if not ficha.rclMonstros or ficha.rclMonstros.selectedNode ~= node then
-            bridgeAck(transferId, "rejected", "a ficha selecionada mudou durante a confirmação")
-            return
+local function bridgeFindExistingNode(ficha, transferId)
+    local found = nil
+    pcall(function()
+        local sheet = ficha and ficha.sheet
+        local lista = sheet and sheet.lista
+        for _, candidate in ipairs(ndb.getChildNodes(lista) or {}) do
+            if tostring(candidate.saoNodeTransferId or "") == transferId then
+                found = candidate
+                break
+            end
         end
-        local ok, erro = aplicarXMLNaFicha(ficha, node, xml)
-        if ok then
-            node.saoNodeTransferId = transferId
-            bridgeAck(transferId, "applied", "Ficha aplicada no MonsterIA")
-        else
-            bridgeAck(transferId, "failed", tostring(erro or "XML inválido"))
-            showMessage("Não consegui aplicar o monstro recebido do SAO-NODE.")
-        end
-    end
-    if nodeHasMeaningfulData(node) then
-        dialogs.confirmYesNo("A ficha selecionada já está preenchida. Substituir pelos dados recebidos do SAO-NODE?", function(confirmed)
-            if confirmed then doApply() else bridgeAck(transferId, "rejected", "substituição cancelada pelo mestre") end
-        end)
-    else
-        doApply()
-    end
+    end)
+    return found
 end
 
-local function pollSaoNodeBridge(ficha)
-    bridgeTokenReady(ficha, function(token)
-        if not saoNodeConsumerId then saoNodeConsumerId = bridgeNewConsumerId() end
-        local heartbeatBody = json.encode({consumerId = saoNodeConsumerId})
-        httpPOSTAuthenticated(SAO_NODE_BRIDGE_URL .. "/sao-node/consumer/heartbeat", heartbeatBody, token,
-            function()
-                local url = SAO_NODE_BRIDGE_URL .. "/sao-node/transfers/next?consumerId=" .. urlEncode(saoNodeConsumerId)
-                httpGETAuthenticated(url, token, function(body)
-                    local ok, payload = pcall(function() return json.decode(body or "") end)
-                    if ok and type(payload) == "table" then
-                        local transfer = payload.transfer or payload
-                        if type(transfer) == "table" and (transfer.transferId or transfer.id) then
-                            applyBridgeTransfer(ficha, transfer)
-                        end
-                    end
-                end, function(err, status)
-                    if status and status ~= 404 and status ~= 204 then
-                        -- O polling é silencioso; erros explícitos aparecem apenas no botão manual.
-                    end
-                end)
-            end, function() end)
+local function bridgeSelectNode(ficha, node)
+    pcall(function() ficha.rclMonstros.selectedNode = node end)
+    pcall(function()
+        if ficha.box ~= nil then
+            ficha.box.node = node
+            ficha.box.visible = node ~= nil
+        end
     end)
 end
 
-function iniciarRecepcaoSaoNode(ficha)
-    if not bridgeCanWrite(ficha) then
-        showMessage("Somente o mestre pode receber monstros do SAO-NODE.")
+local function applyBridgeTransfer(transfer)
+    local transferId = tostring(transfer.transferId or transfer.id or "")
+    local xml = transfer.xml or transfer.xmlCriatura or ""
+    if transferId == "" or xml == "" then
+        bridgeAck(transferId, "failed", "transferencia sem XML ou identificador")
+        bridgeReport("Transferencia invalida: faltam XML ou identificador.")
         return
     end
-    if saoNodeBridgePolling then return end
-    saoNodeBridgePolling = true
-    pollSaoNodeBridge(ficha)
-    saoNodeBridgeTimer = setInterval(function() pollSaoNodeBridge(ficha) end, 3000)
+    if saoNodeBridge.seen[transferId] then
+        local receipt = saoNodeBridge.pendingAcks[transferId]
+        bridgeAck(
+            transferId,
+            receipt and receipt.status or "applied",
+            receipt and receipt.message or "Ficha aplicada no MonsterIA",
+            receipt and receipt.onConfirmed
+        )
+        return
+    end
+
+    local ficha = bridgeCurrentForm()
+    if ficha == nil then
+        bridgeReport("A ficha de destino foi descarregada; a transferencia voltara para a fila.")
+        return
+    end
+    if not bridgeCanWrite(ficha) then
+        bridgeAck(transferId, "failed", "somente o mestre pode receber monstros")
+        bridgeReport("Somente o mestre pode receber monstros.")
+        saoNodeBridge.seen[transferId] = true
+        return
+    end
+
+    local nomeTransferencia = tostring(transfer.monsterName or "Criatura")
+    saoNodeBridge.lastTransferDetail = nomeTransferencia
+    bridgeSetStatus("applying", nomeTransferencia)
+    local existing = bridgeFindExistingNode(ficha, transferId)
+    if existing ~= nil then
+        bridgeSelectNode(ficha, existing)
+        saoNodeBridge.seen[transferId] = true
+        bridgeSetStatus("confirming", nomeTransferencia)
+        bridgeAck(transferId, "applied", "Ficha ja aplicada no MonsterIA", function()
+            bridgeSetStatus("received", nomeTransferencia .. "; aguardando novas fichas")
+        end)
+        return
+    end
+
+    local node = nil
+    local created = pcall(function() node = ficha.rclMonstros:append() end)
+    if not created or node == nil then
+        bridgeAck(transferId, "failed", "nao foi possivel criar o registro de monstro")
+        bridgeReport("Nao foi possivel criar o registro de monstro.")
+        return
+    end
+
+    bridgeSelectNode(ficha, node)
+    local ok, erro = aplicarXMLNaFicha(ficha, node, xml)
+    if ok then
+        local source = type(transfer.monster) == "table" and transfer.monster or {}
+        local media = type(source.media) == "table" and source.media or {}
+        local imageUrl = (type(transfer.imageUrl) == "string" and cleanText(transfer.imageUrl) ~= "" and transfer.imageUrl)
+            or transfer.imageURL or transfer.imagemURL or transfer.image
+            or source.imageUrl or source.imageURL or source.imagemURL or source.image
+            or media.imageUrl or media.imageURL or media.url or media.image
+        local originalSheet = type(transfer.originalSheet) == "string" and transfer.originalSheet or source.originalSheet
+        local sourceJson = type(transfer.saoNodeSourceJson) == "string" and transfer.saoNodeSourceJson or source.saoNodeSourceJson
+        if type(imageUrl) == "string" and cleanText(imageUrl) ~= "" then node.imagemURL = imageURLForSource(imageUrl) end
+        if type(originalSheet) == "string" and cleanText(originalSheet) ~= "" then node.originalSheet = originalSheet end
+        if type(sourceJson) == "string" and cleanText(sourceJson) ~= "" then node.saoNodeSourceJson = sourceJson end
+        node.saoNodeTransferId = transferId
+        saoNodeBridge.seen[transferId] = true
+        bridgeSetStatus("confirming", nomeTransferencia)
+        bridgeAck(transferId, "applied", "Ficha aplicada no MonsterIA", function()
+            bridgeSetStatus("received", nomeTransferencia .. "; aguardando novas fichas")
+        end)
+    else
+        pcall(function() ndb.deleteNode(node) end)
+        bridgeAck(transferId, "failed", tostring(erro or "XML invalido"))
+        bridgeReport("Erro ao aplicar a ficha: " .. tostring(erro or "XML invalido"))
+    end
+end
+
+local function bridgeAbortRequests()
+    if saoNodeBridge.activeRequest ~= nil then
+        pcall(function() saoNodeBridge.activeRequest:abort() end)
+        saoNodeBridge.activeRequest = nil
+    end
+    for transferId, request in pairs(saoNodeBridge.ackRequests) do
+        pcall(function() request:abort() end)
+        saoNodeBridge.ackRequests[transferId] = nil
+    end
+end
+
+local function bridgeStop(code, detail, clearTarget)
+    saoNodeBridge.enabled = false
+    saoNodeBridge.generation = saoNodeBridge.generation + 1
+    bridgeAbortRequests()
+    saoNodeBridge.inFlight = false
+    if saoNodeBridge.timer ~= nil then
+        clearInterval(saoNodeBridge.timer)
+        saoNodeBridge.timer = nil
+    end
+    if clearTarget then saoNodeBridge.targetForm = nil end
+    bridgeSetStatus(code or "paused", detail or "")
+end
+
+local function pollSaoNodeBridge()
+    bridgePruneForms()
+    if not saoNodeBridge.enabled then return end
+    local ficha = bridgeCurrentForm()
+    if ficha == nil then
+        bridgeStop("paused", "Ficha de destino descarregada", true)
+        return
+    end
+    if saoNodeBridge.inFlight then return end
+    if not saoNodeBridge.consumerId then saoNodeBridge.consumerId = bridgeNewConsumerId() end
+    for transferId, receipt in pairs(saoNodeBridge.pendingAcks) do
+        bridgeAck(transferId, receipt.status, receipt.message, receipt.onConfirmed)
+    end
+    local cycle = saoNodeBridge.generation
+    saoNodeBridge.inFlight = true
+    if saoNodeBridge.connection ~= true then bridgeSetStatus("connecting", "Conectando ao proxy") end
+    local heartbeatBody = json.encode({consumerId = saoNodeBridge.consumerId, ready = true})
+    saoNodeBridge.activeRequest = httpPOST(
+        SAO_NODE_BRIDGE_URL .. "/sao-node/consumer/heartbeat",
+        heartbeatBody,
+        function(body)
+            if not saoNodeBridge.enabled or cycle ~= saoNodeBridge.generation then return end
+            local validHeartbeat, receipt = pcall(function() return json.decode(body or "") end)
+            if not validHeartbeat or type(receipt) ~= "table" or receipt.ok ~= true then
+                saoNodeBridge.activeRequest = nil
+                saoNodeBridge.inFlight = false
+                bridgeReport("Heartbeat: resposta invalida do proxy; " .. tostring(body or ""))
+                return
+            end
+            bridgeConnection(true)
+            local url = SAO_NODE_BRIDGE_URL .. "/sao-node/transfers/next?consumerId=" .. urlEncode(saoNodeBridge.consumerId)
+            saoNodeBridge.activeRequest = httpGET(url,
+                function(responseBody, status)
+                    if not saoNodeBridge.enabled or cycle ~= saoNodeBridge.generation then return end
+                    saoNodeBridge.activeRequest = nil
+                    saoNodeBridge.inFlight = false
+                    if tonumber(status or 0) == 204 then
+                        local detail = "Nenhuma ficha na fila"
+                        if saoNodeBridge.lastTransferDetail ~= "" then detail = detail .. "; última: " .. saoNodeBridge.lastTransferDetail end
+                        bridgeSetStatus("waiting", detail)
+                        return
+                    end
+                    local ok, payload = pcall(function() return json.decode(responseBody or "") end)
+                    if ok and type(payload) == "table" then
+                        local transfer = payload.transfer or payload
+                        if type(transfer) == "table" and (transfer.transferId or transfer.id) then
+                            local applied, applyError = pcall(applyBridgeTransfer, transfer)
+                            if not applied then
+                                local transferKey = tostring(transfer.transferId or transfer.id or "")
+                                bridgeAck(transferKey, "failed", tostring(applyError or "erro interno ao aplicar a ficha"))
+                                bridgeReport("Aplicacao: " .. tostring(applyError or "erro interno ao receber a ficha"))
+                            end
+                        end
+                    else
+                        bridgeReport("Consulta: JSON invalido do proxy; " .. tostring(payload or responseBody or ""))
+                    end
+                end,
+                function(err, status, responseText)
+                    if not saoNodeBridge.enabled or cycle ~= saoNodeBridge.generation then return end
+                    saoNodeBridge.activeRequest = nil
+                    saoNodeBridge.inFlight = false
+                    if tonumber(status or 0) == 0 then
+                        bridgeConnection(false)
+                        bridgeSetStatus("offline", "Consulta: " .. tostring(err or "proxy indisponivel") .. "; " .. tostring(responseText or ""))
+                    else
+                        bridgeReport("Consulta: " .. tostring(err or "erro") .. " (HTTP " .. tostring(status) .. "); " .. tostring(responseText or ""))
+                    end
+                end)
+        end,
+        function(err, status, responseText)
+            if not saoNodeBridge.enabled or cycle ~= saoNodeBridge.generation then return end
+            saoNodeBridge.activeRequest = nil
+            saoNodeBridge.inFlight = false
+            if tonumber(status or 0) == 0 then
+                bridgeConnection(false)
+                bridgeSetStatus("offline", "Heartbeat: " .. tostring(err or "proxy indisponivel") .. "; " .. tostring(responseText or ""))
+            else
+                bridgeReport("Heartbeat: " .. tostring(err or "erro") .. " (HTTP " .. tostring(status) .. "); " .. tostring(responseText or ""))
+            end
+        end
+    )
+end
+
+function iniciarRecepcaoSaoNode(ficha)
+    bridgeRegisterForm(ficha)
+    if not saoNodeBridge.enabled then bridgeSetStatus("paused", "Clique em Aguardar fichas") end
+end
+
+function alternarRecepcaoSaoNode(ficha)
+    bridgeRegisterForm(ficha)
+    if saoNodeBridge.enabled and saoNodeBridge.targetForm == ficha then
+        bridgeStop("paused", "Clique em Aguardar fichas para retomar", false)
+        return
+    end
+    if not bridgeCanWrite(ficha) then
+        bridgeReport("Somente o mestre pode receber monstros.")
+        return
+    end
+    saoNodeBridge.targetForm = ficha
+    saoNodeBridge.enabled = true
+    saoNodeBridge.generation = saoNodeBridge.generation + 1
+    -- A troca de aba invalida a requisição anterior. O callback antigo é
+    -- ignorado pelo generation e a nova aba pode consultar imediatamente.
+    bridgeAbortRequests()
+    saoNodeBridge.inFlight = false
+    saoNodeBridge.connection = nil
+    bridgeSetStatus("connecting", "Iniciando recepcao")
+    if saoNodeBridge.timer == nil then
+        saoNodeBridge.timer = setInterval(pollSaoNodeBridge, BRIDGE_POLL_INTERVAL_MS)
+    end
+    pollSaoNodeBridge()
+end
+
+function finalizarRecepcaoSaoNode(ficha)
+    for i = #saoNodeBridge.forms, 1, -1 do
+        if saoNodeBridge.forms[i] == ficha then table.remove(saoNodeBridge.forms, i) end
+    end
+    if saoNodeBridge.targetForm == ficha then
+        bridgeStop("paused", "Ficha de destino descarregada", true)
+    else
+        bridgeRenderStatus(ficha)
+    end
 end
 
 function receberDoSaoNode(ficha)
-    if not bridgeCanWrite(ficha) then
-        showMessage("Somente o mestre pode receber monstros do SAO-NODE.")
-        return
+    if not saoNodeBridge.enabled or saoNodeBridge.targetForm ~= ficha then
+        alternarRecepcaoSaoNode(ficha)
+    else
+        pollSaoNodeBridge()
     end
-    pollSaoNodeBridge(ficha)
 end
 
 ------------------------------------------------------------

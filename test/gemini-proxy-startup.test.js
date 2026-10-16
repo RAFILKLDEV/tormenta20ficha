@@ -6,14 +6,24 @@ const { spawn, spawnSync } = require('node:child_process');
 const { once } = require('node:events');
 
 const proxyScript = path.resolve(__dirname, '../gemini-proxy.js');
+const launcherScript = path.resolve(__dirname, '../scripts/start-firecast-proxy.js');
 
 function proxyEnv(port) {
-  return { ...process.env, PORT: String(port), GEMINI_API_KEY: '', SAO_NODE_SESSION_COOKIE: '' };
+  return { ...process.env, PORT: String(port), GEMINI_API_KEY: '' };
+}
+
+function runLauncher(env) {
+  const child = spawn(process.execPath, [launcherScript], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+  let stdout = '';
+  let stderr = '';
+  child.stdout.setEncoding('utf8').on('data', (chunk) => { stdout += chunk; });
+  child.stderr.setEncoding('utf8').on('data', (chunk) => { stderr += chunk; });
+  return once(child, 'close').then(([code, signal]) => ({ code, signal, stdout, stderr }));
 }
 
 test('iniciar em porta ocupada informa o erro e termina com falha', async (t) => {
   const occupied = http.createServer();
-  occupied.listen(0, '::');
+  occupied.listen(0, '127.0.0.1');
   await once(occupied, 'listening');
   t.after(() => new Promise((resolve) => occupied.close(resolve)));
 
@@ -25,6 +35,33 @@ test('iniciar em porta ocupada informa o erro e termina com falha', async (t) =>
   assert.equal(result.status, 1);
   assert.match(result.stderr, /porta .* em uso/i);
   assert.doesNotMatch(result.stdout, /Proxy rodando/);
+});
+
+test('launcher detecta proxy saudavel ja ativo e nao inicia um segundo processo', async (t) => {
+  const occupied = http.createServer((req, res) => {
+    if (req.url !== '/sao-node/status') return res.writeHead(404).end();
+    res.setHeader('content-type', 'application/json');
+    res.end(JSON.stringify({ ok: true, proxy: true }));
+  });
+  occupied.listen(0, '127.0.0.1');
+  await once(occupied, 'listening');
+  const logFile = path.join(require('node:os').tmpdir(), `sao-launch-${process.pid}-${Date.now()}.log`);
+  t.after(() => new Promise((resolve) => occupied.close(resolve)));
+  const result = await runLauncher({ ...process.env, PORT: String(occupied.address().port), FIRECAST_START_LOG: logFile });
+  assert.equal(result.code, 0, result.stderr);
+  assert.match(result.stdout, /Proxy j. est. ativo/i);
+});
+
+test('launcher recusa porta ocupada por servico que nao e o proxy e preserva a fila', async (t) => {
+  const occupied = http.createServer((req, res) => res.writeHead(200).end('outro-servico'));
+  occupied.listen(0, '127.0.0.1');
+  await once(occupied, 'listening');
+  const logFile = path.join(require('node:os').tmpdir(), `sao-launch-${process.pid}-${Date.now()}.log`);
+  t.after(() => new Promise((resolve) => occupied.close(resolve)));
+  const result = await runLauncher({ ...process.env, PORT: String(occupied.address().port), FIRECAST_START_LOG: logFile });
+  assert.equal(result.code, 1, result.stderr);
+  assert.match(result.stdout, /ocupado/i);
+  assert.match(result.stdout, /fila preservada/i);
 });
 
 test('iniciar em porta livre mantém o servidor respondendo e informa a porta real', async (t) => {

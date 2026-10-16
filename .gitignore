@@ -1,2 +1,4 @@
 .openclaude-profile.json
 .env
+.sao-node-transfers.json*
+.sao-node-proxy-start.log

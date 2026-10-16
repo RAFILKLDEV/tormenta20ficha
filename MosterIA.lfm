@@ -70,7 +70,16 @@
         onNodeReady(self)
     </event>
 
-    <!-- BOTAO NOVO MONSTRO / TESTE -->
+    <!-- Mantém o consumidor global sincronizado com o ciclo de vida da janela. -->
+    <event name="onShow">
+        iniciarRecepcaoSaoNode(self)
+    </event>
+
+    <event name="onNodeUnready">
+        finalizarRecepcaoSaoNode(self)
+    </event>
+
+    <!-- CONTROLE DA RECEPCAO SAO-NODE -->
     <layout align="top" height="30" margins="{bottom=4}">
         <button text="Novo Monstro" width="120" align="left">
             <event name="onClick">
@@ -78,11 +87,13 @@
             </event>
         </button>
 
-        <button text="TESTE" width="120" align="left">
+        <button name="btnAguardarFichas" text="Aguardar fichas" width="170" align="left" margins="{left=8}">
             <event name="onClick">
-                showMessage("Botao de teste sem funcao definida.");
+                alternarRecepcaoSaoNode(self);
             </event>
         </button>
+
+        <label name="lblSaoNodeStatus" text="Pausado" width="520" align="left" margins="{left=12}" />
     </layout>
 
     <!-- LISTA DE MONSTROS -->
@@ -101,6 +112,9 @@
 
             -- limpa e recria botoes sempre que trocar o selecionado
             rebuildButtonsFromNode(self, node)
+
+            atualizarImagemDaFicha(self, node)
+            agendarAtualizacaoImagemDaFicha(self, node)
 
             if node ~= nil then
                 atualizarMana(self)
@@ -196,11 +210,11 @@
                     </layout>
 
                     <layout align="top" height="140" margins="{top=4, bottom=4}">
-                        <image field="imagemURL"
+                        <image name="imgImagem" field="imagemURL"
                             align="left"
                             width="140"
                             height="140"
-                            editable="true"
+                            editable="false"
                             style="autoFit"
                             center="true"
                             showProgress="true" />

@@ -7,7 +7,8 @@
   "type": "commonjs",
   "scripts": {
     "test": "node --test",
-    "start": "node --env-file-if-exists=.env gemini-proxy.js"
+    "start": "node --env-file-if-exists=.env gemini-proxy.js",
+    "start:firecast": "node --env-file-if-exists=.env scripts/start-firecast-proxy.js"
   },
   "license": "ISC",
   "dependencies": {
@@ -19,5 +20,9 @@
       "node18-win-x64"
     ],
     "outputPath": "output"
+  },
+  "devDependencies": {
+    "fengari": "^0.1.5",
+    "fengari-interop": "^0.1.4"
   }
 }
